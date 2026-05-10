@@ -1,9 +1,40 @@
-// =============================================================================
-// CONFIGURATION - Set this to your deployed backend URL before deploying
-// For local development: ''  (empty string, uses same origin)
-// For production: 'https://your-app-name.onrender.com'
-// =============================================================================
 const API_BASE = 'https://investinghub.onrender.com';
+
+// Logo URL helper - uses multiple sources for company logos
+function getCompanyLogoUrl(symbol) {
+    if (!symbol) return '';
+    const clean = symbol.replace('^', '').replace('-USD', '').replace('=F', '');
+    const domainMap = {
+        'AAPL': 'apple.com', 'MSFT': 'microsoft.com', 'GOOGL': 'google.com', 'GOOG': 'google.com',
+        'AMZN': 'amazon.com', 'META': 'meta.com', 'TSLA': 'tesla.com', 'NVDA': 'nvidia.com',
+        'NFLX': 'netflix.com', 'DIS': 'disney.com', 'PYPL': 'paypal.com', 'INTC': 'intel.com',
+        'AMD': 'amd.com', 'CRM': 'salesforce.com', 'ORCL': 'oracle.com', 'IBM': 'ibm.com',
+        'CSCO': 'cisco.com', 'ADBE': 'adobe.com', 'SHOP': 'shopify.com', 'SQ': 'squareup.com',
+        'SPOT': 'spotify.com', 'UBER': 'uber.com', 'LYFT': 'lyft.com', 'SNAP': 'snap.com',
+        'TWTR': 'twitter.com', 'PINS': 'pinterest.com', 'ZM': 'zoom.us', 'DOCU': 'docusign.com',
+        'WMT': 'walmart.com', 'TGT': 'target.com', 'HD': 'homedepot.com', 'LOW': 'lowes.com',
+        'COST': 'costco.com', 'SBUX': 'starbucks.com', 'MCD': 'mcdonalds.com', 'NKE': 'nike.com',
+        'KO': 'coca-cola.com', 'PEP': 'pepsico.com', 'JNJ': 'jnj.com', 'PFE': 'pfizer.com',
+        'MRNA': 'modernatx.com', 'UNH': 'unitedhealthgroup.com', 'V': 'visa.com', 'MA': 'mastercard.com',
+        'JPM': 'jpmorganchase.com', 'BAC': 'bankofamerica.com', 'GS': 'goldmansachs.com',
+        'MS': 'morganstanley.com', 'WFC': 'wellsfargo.com', 'C': 'citigroup.com',
+        'BA': 'boeing.com', 'XOM': 'exxonmobil.com', 'CVX': 'chevron.com',
+        'BRK.B': 'berkshirehathaway.com', 'BRK-B': 'berkshirehathaway.com',
+        'T': 'att.com', 'VZ': 'verizon.com', 'TMUS': 't-mobile.com',
+        'F': 'ford.com', 'GM': 'gm.com', 'RIVN': 'rivian.com', 'LCID': 'lucidmotors.com',
+        'COIN': 'coinbase.com', 'HOOD': 'robinhood.com', 'SOFI': 'sofi.com',
+        'PLTR': 'palantir.com', 'SNOW': 'snowflake.com', 'CRWD': 'crowdstrike.com',
+        'NET': 'cloudflare.com', 'DDOG': 'datadoghq.com', 'MDB': 'mongodb.com',
+        'ABNB': 'airbnb.com', 'BKNG': 'booking.com', 'EXPE': 'expedia.com',
+        'ARM': 'arm.com', 'AVGO': 'broadcom.com', 'QCOM': 'qualcomm.com',
+        'TXN': 'ti.com', 'MU': 'micron.com', 'AMAT': 'appliedmaterials.com',
+    };
+    const domain = domainMap[clean.toUpperCase()];
+    if (domain) {
+        return `https://logo.clearbit.com/${domain}`;
+    }
+    return `https://logo.clearbit.com/${clean.toLowerCase()}.com`;
+}
 
 function app() {
     return {
@@ -14,9 +45,20 @@ function app() {
 
         darkMode: true,
 
+        // Auth
+        authToken: localStorage.getItem('investorhub-token') || '',
+        currentUser: JSON.parse(localStorage.getItem('investorhub-user') || 'null'),
+        showLoginModal: false,
+        showRegisterModal: false,
+        authError: '',
+        authLoading: false,
+        loginForm: { email: '', password: '' },
+        registerForm: { name: '', email: '', password: '' },
+
         navItems: [
             { id: 'dashboard', label: 'Dashboard', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>' },
-            { id: 'analysis', label: 'Stock Analysis', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' },
+            { id: 'news', label: 'News', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>' },
+            { id: 'analysis', label: 'Analysis', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>' },
             { id: 'compare', label: 'Compare', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>' },
             { id: 'portfolio', label: 'Portfolio', icon: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>' },
         ],
@@ -25,6 +67,10 @@ function app() {
         marketLoading: false,
         watchlist: [],
         watchlistLoading: false,
+
+        // News
+        marketNews: [],
+        newsLoading: false,
 
         portfolio: [],
         portfolioLoading: false,
@@ -41,6 +87,13 @@ function app() {
         fundamentalsData: null,
         financialsTab: 'income',
         financialsPeriod: 'annual',
+
+        // Stock Score
+        stockScore: null,
+
+        // Stock News
+        stockNews: null,
+        stockNewsLoading: false,
 
         compareInput: '',
         compareData: null,
@@ -83,6 +136,82 @@ function app() {
             this.loadPortfolio();
         },
 
+        // -- Auth Methods --------------------------------------------------------
+        getAuthHeaders() {
+            if (!this.authToken) return {};
+            return { 'Authorization': `Bearer ${this.authToken}` };
+        },
+
+        async login() {
+            this.authError = '';
+            this.authLoading = true;
+            try {
+                const resp = await fetch(API_BASE + '/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.loginForm),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    this.authError = data.error || 'Login failed';
+                    this.authLoading = false;
+                    return;
+                }
+                this.authToken = data.token;
+                this.currentUser = data.user;
+                localStorage.setItem('investorhub-token', data.token);
+                localStorage.setItem('investorhub-user', JSON.stringify(data.user));
+                this.showLoginModal = false;
+                this.loginForm = { email: '', password: '' };
+                this.loadPortfolio();
+                this.loadWatchlist();
+            } catch (e) {
+                this.authError = 'Connection error. Please try again.';
+            }
+            this.authLoading = false;
+        },
+
+        async register() {
+            this.authError = '';
+            this.authLoading = true;
+            try {
+                const resp = await fetch(API_BASE + '/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.registerForm),
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    this.authError = data.error || 'Registration failed';
+                    this.authLoading = false;
+                    return;
+                }
+                this.authToken = data.token;
+                this.currentUser = data.user;
+                localStorage.setItem('investorhub-token', data.token);
+                localStorage.setItem('investorhub-user', JSON.stringify(data.user));
+                this.showRegisterModal = false;
+                this.registerForm = { name: '', email: '', password: '' };
+                this.loadPortfolio();
+                this.loadWatchlist();
+            } catch (e) {
+                this.authError = 'Connection error. Please try again.';
+            }
+            this.authLoading = false;
+        },
+
+        logout() {
+            this.authToken = '';
+            this.currentUser = null;
+            localStorage.removeItem('investorhub-token');
+            localStorage.removeItem('investorhub-user');
+            this.portfolio = [];
+            this.watchlist = [];
+            this.loadWatchlist();
+            this.loadPortfolio();
+        },
+
+        // -- Theme ---------------------------------------------------------------
         toggleTheme() {
             this.darkMode = !this.darkMode;
             this.applyTheme();
@@ -127,6 +256,9 @@ function app() {
                 this.loadWatchlist();
                 this.loadPortfolio();
             }
+            if (page === 'news' && this.marketNews.length === 0) {
+                this.loadMarketNews();
+            }
             if (page === 'portfolio') {
                 this.$nextTick(() => { if (this.portfolio.length > 0) this.renderPortfolioCharts(); });
             }
@@ -144,9 +276,23 @@ function app() {
             this.$nextTick(() => {
                 if (tab === 'Technicals') this.loadTechnicals(this.analysisData?.symbol);
                 if (tab === 'Fundamentals' && this.fundamentalsData) this.renderFundamentalsCharts();
+                if (tab === 'News' && !this.stockNews) this.loadStockNews(this.analysisData?.symbol);
             });
         },
 
+        // -- Logo Helper ---------------------------------------------------------
+        getLogoUrl(symbol) {
+            return getCompanyLogoUrl(symbol);
+        },
+
+        // -- Score Color Helper --------------------------------------------------
+        getScoreColor(score) {
+            if (score >= 7) return '#10b981';
+            if (score >= 5) return '#f59e0b';
+            return '#ef4444';
+        },
+
+        // -- Formatting ----------------------------------------------------------
         formatPrice(val) {
             if (!val && val !== 0) return '—';
             return '$' + parseFloat(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -187,24 +333,38 @@ function app() {
             return parseFloat(val) >= 0 ? 'text-emerald-500' : 'text-red-500';
         },
 
-        // -- API helpers (all calls go through API_BASE) ----------------------
+        formatNewsDate(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp * 1000);
+            const now = new Date();
+            const diff = (now - date) / 1000;
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        },
+
+        // -- API helpers ---------------------------------------------------------
         async fetchJson(url) {
-            const resp = await fetch(API_BASE + url);
+            const headers = this.getAuthHeaders();
+            const resp = await fetch(API_BASE + url, { headers });
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             return resp.json();
         },
 
         async postJson(url, data) {
+            const headers = { 'Content-Type': 'application/json', ...this.getAuthHeaders() };
             const resp = await fetch(API_BASE + url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(data),
             });
             return resp.json();
         },
 
         async deleteJson(url) {
-            await fetch(API_BASE + url, { method: 'DELETE' });
+            const headers = this.getAuthHeaders();
+            await fetch(API_BASE + url, { method: 'DELETE', headers });
         },
 
         // -- Search -----------------------------------------------------------
@@ -230,6 +390,26 @@ function app() {
             try { this.marketData = await this.fetchJson('/api/market'); }
             catch (e) { console.error(e); }
             this.marketLoading = false;
+        },
+
+        // -- Market News ---------------------------------------------------------
+        async loadMarketNews() {
+            this.newsLoading = true;
+            try {
+                const data = await this.fetchJson('/api/market-news');
+                this.marketNews = data.news || [];
+            } catch (e) { console.error(e); }
+            this.newsLoading = false;
+        },
+
+        // -- Stock News -----------------------------------------------------------
+        async loadStockNews(symbol) {
+            if (!symbol) return;
+            this.stockNewsLoading = true;
+            try {
+                this.stockNews = await this.fetchJson(`/api/news/${symbol}`);
+            } catch (e) { console.error(e); }
+            this.stockNewsLoading = false;
         },
 
         // -- Watchlist --------------------------------------------------------
@@ -315,7 +495,7 @@ function app() {
                     xaxis: { categories: labels, labels: { style: { colors: c.apexText } } },
                     yaxis: { labels: { style: { colors: c.apexText }, formatter: v => '$' + v.toLocaleString() } },
                     colors: barColors,
-                    plotOptions: { bar: { distributed: true, borderRadius: 4, columnWidth: '60%' } },
+                    plotOptions: { bar: { distributed: true, borderRadius: 6, columnWidth: '55%' } },
                     theme: { mode: c.apexMode },
                     grid: { borderColor: c.apexGrid, strokeDashArray: 3 },
                     legend: { show: false },
@@ -334,6 +514,8 @@ function app() {
             this.analysisData = null;
             this.analysisStats = [];
             this.fundamentalsData = null;
+            this.stockScore = null;
+            this.stockNews = null;
             this.analysisTab = 'Price Chart';
 
             try {
@@ -363,6 +545,7 @@ function app() {
 
                 this.$nextTick(() => this.loadPriceChart(symbol));
                 this.fetchFundamentals(symbol);
+                this.fetchStockScore(symbol);
             } catch (e) { console.error(e); }
             this.analysisLoading = false;
         },
@@ -370,6 +553,12 @@ function app() {
         async fetchFundamentals(symbol) {
             try {
                 this.fundamentalsData = await this.fetchJson(`/api/fundamentals/${symbol}`);
+            } catch (e) { console.error(e); }
+        },
+
+        async fetchStockScore(symbol) {
+            try {
+                this.stockScore = await this.fetchJson(`/api/score/${symbol}`);
             } catch (e) { console.error(e); }
         },
 
@@ -394,31 +583,29 @@ function app() {
         _statementOrders() {
             return {
                 income: [
-                    '#Revenue','*Total Revenue','Operating Revenue','Cost Of Revenue','Reconciled Cost Of Revenue','*Gross Profit',
-                    '#Operating Expenses','Research And Development','Selling General And Administration','General And Administrative Expense','Selling And Marketing Expense','Salaries And Wages','Occupancy And Equipment','Professional Expense And Contract Services Expense','Other Non Interest Expense','Restructuring And Mergern Acquisition','Operating Expense','Total Expenses','*Operating Income','Total Operating Income As Reported','*EBIT',
-                    '#Other Income / Expense','Interest Income','Interest Income Non Operating','Interest Expense','Interest Expense Non Operating','Net Interest Income','Net Non Operating Interest Income Expense','Other Income Expense','Other Non Operating Income Expenses','Gain On Sale Of Security','Special Income Charges','Other Special Charges','Total Unusual Items','Total Unusual Items Excluding Goodwill',
-                    '#Income Before Tax','*Pretax Income','Tax Provision','Tax Rate For Calcs','Tax Effect Of Unusual Items',
-                    '#Net Income','*Net Income','Net Income Common Stockholders','Net Income Continuous Operations','Net Income From Continuing And Discontinued Operation','Net Income From Continuing Operation Net Minority Interest','Net Income Including Noncontrolling Interests','Diluted NI Availto Com Stockholders','Normalized Income','Preferred Stock Dividends','Otherunder Preferred Stock Dividend',
-                    '#EBITDA & Depreciation','*EBITDA','Normalized EBITDA','Reconciled Depreciation',
-                    '#Per Share Data','Basic EPS','Diluted EPS','Basic Average Shares','Diluted Average Shares',
+                    '#Revenue','*Total Revenue','Operating Revenue','Cost Of Revenue','*Gross Profit',
+                    '#Operating Expenses','Research And Development','Selling General And Administration','Operating Expense','Total Expenses','*Operating Income','*EBIT',
+                    '#Other Income / Expense','Interest Income','Interest Expense','Net Non Operating Interest Income Expense','Other Income Expense',
+                    '#Income Before Tax','*Pretax Income','Tax Provision',
+                    '#Net Income','*Net Income','Net Income Common Stockholders','Diluted NI Availto Com Stockholders',
+                    '#EBITDA','*EBITDA','Normalized EBITDA','Reconciled Depreciation',
+                    '#Per Share','Basic EPS','Diluted EPS','Basic Average Shares','Diluted Average Shares',
                 ],
                 balance: [
-                    '#Current Assets','Cash And Cash Equivalents','Cash Equivalents','Cash Financial','Cash Cash Equivalents And Short Term Investments','Cash Cash Equivalents And Federal Funds Sold','Other Short Term Investments','Trading Securities','Available For Sale Securities','Held To Maturity Securities','Accounts Receivable','Receivables','Other Receivables','Inventory','Other Current Assets','*Current Assets',
-                    '#Non-Current Assets','Net PPE','Gross PPE','Accumulated Depreciation','Land And Improvements','Machinery Furniture Equipment','Other Properties','Properties','Leases','Goodwill','Goodwill And Other Intangible Assets','Other Intangible Assets','Investmentin Financial Assets','Investments And Advances','Other Investments','Non Current Deferred Assets','Non Current Deferred Taxes Assets','Other Non Current Assets','*Total Non Current Assets',
+                    '#Current Assets','Cash And Cash Equivalents','Other Short Term Investments','Accounts Receivable','Inventory','Other Current Assets','*Current Assets',
+                    '#Non-Current Assets','Net PPE','Goodwill And Other Intangible Assets','Other Non Current Assets','*Total Non Current Assets',
                     '#Total Assets','*Total Assets',
-                    '#Current Liabilities','Accounts Payable','Payables','Payables And Accrued Expenses','Current Accrued Expenses','Current Debt','Current Debt And Capital Lease Obligation','Current Capital Lease Obligation','Other Current Borrowings','Commercial Paper','Current Deferred Liabilities','Current Deferred Revenue','Income Tax Payable','Total Tax Payable','Other Payable','Other Current Liabilities','*Current Liabilities',
-                    '#Non-Current Liabilities','Long Term Debt','Long Term Debt And Capital Lease Obligation','Long Term Capital Lease Obligation','Capital Lease Obligations','Tradeand Other Payables Non Current','Other Non Current Liabilities','*Total Non Current Liabilities Net Minority Interest',
+                    '#Current Liabilities','Accounts Payable','Current Debt','Other Current Liabilities','*Current Liabilities',
+                    '#Non-Current Liabilities','Long Term Debt','Other Non Current Liabilities','*Total Non Current Liabilities Net Minority Interest',
                     '#Total Liabilities','*Total Liabilities Net Minority Interest',
-                    '#Stockholders\' Equity','Preferred Stock','Preferred Stock Equity','Common Stock','Capital Stock','Additional Paid In Capital','Retained Earnings','Treasury Stock','Gains Losses Not Affecting Retained Earnings','Other Equity Adjustments','*Stockholders Equity','Common Stock Equity','*Total Equity Gross Minority Interest',
-                    '#Supplemental','Net Debt','Total Debt','Invested Capital','Total Capitalization','Share Issued','Ordinary Shares Number','Preferred Shares Number','Treasury Shares Number','Working Capital','Net Tangible Assets','Tangible Book Value',
+                    '#Equity','Common Stock','Retained Earnings','Treasury Stock','*Stockholders Equity','*Total Equity Gross Minority Interest',
+                    '#Supplemental','Net Debt','Total Debt','Working Capital','Share Issued',
                 ],
                 cashflow: [
-                    '#Cash from Operating Activities','Net Income From Continuing Operations','Depreciation And Amortization','Depreciation Amortization Depletion','Stock Based Compensation','Deferred Income Tax','Deferred Tax','Operating Gains Losses','Gain Loss On Investment Securities','Gain Loss On Sale Of Business','Other Non Cash Items',
-                    '#Changes in Working Capital','Change In Working Capital','Changes In Account Receivables','Change In Receivables','Change In Inventory','Change In Account Payable','Change In Payable','Change In Payables And Accrued Expense','Change In Other Current Assets','Change In Other Current Liabilities','Change In Other Working Capital','*Operating Cash Flow','Cash Flow From Continuing Operating Activities',
-                    '#Cash from Investing Activities','Capital Expenditure','Purchase Of PPE','Net PPE Purchase And Sale','Purchase Of Investment','Sale Of Investment','Net Investment Purchase And Sale','Purchase Of Business','Net Business Purchase And Sale','Net Other Investing Changes','*Investing Cash Flow','Cash Flow From Continuing Investing Activities',
-                    '#Cash from Financing Activities','Issuance Of Capital Stock','Common Stock Issuance','Repurchase Of Capital Stock','Common Stock Payments','Net Common Stock Issuance','Preferred Stock Issuance','Preferred Stock Payments','Net Preferred Stock Issuance','Issuance Of Debt','Long Term Debt Issuance','Long Term Debt Payments','Repayment Of Debt','Net Long Term Debt Issuance','Net Short Term Debt Issuance','Net Issuance Payments Of Debt','Cash Dividends Paid','Common Stock Dividend Paid','Net Other Financing Charges','*Financing Cash Flow','Cash Flow From Continuing Financing Activities',
-                    '#Net Change in Cash','Effect Of Exchange Rate Changes','Changes In Cash','Beginning Cash Position','End Cash Position','*Free Cash Flow',
-                    '#Supplemental Data','Income Tax Paid Supplemental Data','Interest Paid Supplemental Data',
+                    '#Operating Activities','Net Income From Continuing Operations','Depreciation And Amortization','Stock Based Compensation','Change In Working Capital','*Operating Cash Flow',
+                    '#Investing Activities','Capital Expenditure','Net Investment Purchase And Sale','*Investing Cash Flow',
+                    '#Financing Activities','Net Common Stock Issuance','Net Issuance Payments Of Debt','Cash Dividends Paid','*Financing Cash Flow',
+                    '#Net Change','Changes In Cash','Beginning Cash Position','End Cash Position','*Free Cash Flow',
                 ],
             };
         },
@@ -597,7 +784,7 @@ function app() {
                 xaxis: { categories: years, labels: { style: { colors: c.apexText } } },
                 yaxis: { labels: { style: { colors: c.apexText }, formatter: v => '$' + v.toLocaleString() + 'M' } },
                 colors: ['#6366f1', '#10b981'],
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '50%' } },
+                plotOptions: { bar: { borderRadius: 6, columnWidth: '50%' } },
                 grid: { borderColor: c.apexGrid, strokeDashArray: 3 },
                 theme: { mode: c.apexMode },
                 legend: { labels: { colors: c.apexText } },
@@ -635,7 +822,7 @@ function app() {
                 xaxis: { categories: cfYears, labels: { style: { colors: c.apexText } } },
                 yaxis: { labels: { style: { colors: c.apexText }, formatter: v => '$' + v.toLocaleString() + 'M' } },
                 colors: ['#6366f1', '#ef4444', '#10b981'],
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '50%' } },
+                plotOptions: { bar: { borderRadius: 6, columnWidth: '50%' } },
                 grid: { borderColor: c.apexGrid, strokeDashArray: 3 },
                 theme: { mode: c.apexMode },
                 legend: { labels: { colors: c.apexText } },
