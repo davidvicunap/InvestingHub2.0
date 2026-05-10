@@ -1,16 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InvestorHub - Smart Portfolio Analytics</title>
+    <title>InvestorHub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
+        // Apply theme immediately to prevent flash
+        (function(){
+            const t = localStorage.getItem('investorhub-theme');
+            if (t === 'light') document.documentElement.classList.remove('dark');
+        })();
         tailwind.config = {
             darkMode: 'class',
             theme: {
@@ -18,863 +22,535 @@
                     fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
                     colors: {
                         brand: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+                        surface: { 50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',700:'#0f1729',800:'#0b1120',900:'#060a14' }
                     }
                 }
             }
         }
     </script>
     <style>
-        [x-cloak] { display: none !important; }
-        body { font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
+        [x-cloak]{display:none!important}
+        body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'cv02','cv03','cv04','cv11'}
 
-        :root {
-            --bg-base: #f8fafc;
-            --bg-raised: #ffffff;
-            --bg-surface: #ffffff;
-            --bg-inset: #f1f5f9;
-            --bg-glass: rgba(248,250,252,0.85);
-            --text-heading: #0f172a;
-            --text-body: #334155;
-            --text-muted: #64748b;
-            --text-faint: #94a3b8;
-            --border: #e2e8f0;
-            --border-subtle: #f1f5f9;
-            --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
-            --shadow-card-hover: 0 8px 25px rgba(0,0,0,0.08);
-            --shadow-xl: 0 20px 60px rgba(0,0,0,0.12);
-            --chart-bg: #ffffff;
-            --chart-grid: #f1f5f9;
-            --chart-text: #64748b;
-            --chart-cross: #94a3b8;
-            --scrollbar-track: #f1f5f9;
-            --scrollbar-thumb: #cbd5e1;
-            --input-bg: #f8fafc;
-            --input-border: #e2e8f0;
-            --hover-bg: rgba(99,102,241,0.04);
-            --row-alt: rgba(0,0,0,0.015);
-            --accent-glow: rgba(99,102,241,0.15);
+        /* ── Theme tokens ── */
+        :root{
+            --bg-0:#f8fafc;--bg-1:#ffffff;--bg-2:#f1f5f9;--bg-3:#e2e8f0;
+            --fg-0:#0f172a;--fg-1:#334155;--fg-2:#64748b;--fg-3:#94a3b8;
+            --border:#e2e8f0;--border-s:#f1f5f9;
+            --card-shadow:0 1px 3px rgba(0,0,0,.04);
+            --card-shadow-h:0 8px 30px rgba(0,0,0,.08);
+            --glass:rgba(248,250,252,.82);
         }
-        html.dark {
-            --bg-base: #06080f;
-            --bg-raised: #0c1120;
-            --bg-surface: #111827;
-            --bg-inset: #0c1120;
-            --bg-glass: rgba(6,8,15,0.88);
-            --text-heading: #f1f5f9;
-            --text-body: #94a3b8;
-            --text-muted: #64748b;
-            --text-faint: #475569;
-            --border: rgba(55,65,81,0.5);
-            --border-subtle: rgba(55,65,81,0.3);
-            --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
-            --shadow-card-hover: 0 8px 30px rgba(0,0,0,0.5);
-            --shadow-xl: 0 20px 60px rgba(0,0,0,0.6);
-            --chart-bg: #111827;
-            --chart-grid: #1e293b;
-            --chart-text: #64748b;
-            --chart-cross: #475569;
-            --scrollbar-track: #0c1120;
-            --scrollbar-thumb: #374151;
-            --input-bg: #0c1120;
-            --input-border: rgba(55,65,81,0.5);
-            --hover-bg: rgba(99,102,241,0.06);
-            --row-alt: rgba(255,255,255,0.02);
-            --accent-glow: rgba(99,102,241,0.2);
+        html.dark{
+            --bg-0:#060a14;--bg-1:#0f1729;--bg-2:#162036;--bg-3:#1e293b;
+            --fg-0:#f1f5f9;--fg-1:#cbd5e1;--fg-2:#64748b;--fg-3:#475569;
+            --border:rgba(55,65,81,.45);--border-s:rgba(55,65,81,.25);
+            --card-shadow:0 1px 3px rgba(0,0,0,.4);
+            --card-shadow-h:0 8px 30px rgba(0,0,0,.55);
+            --glass:rgba(6,10,20,.82);
         }
 
-        .th-page   { background: var(--bg-base); color: var(--text-body); }
-        .th-sidebar{ background: var(--bg-raised); border-color: var(--border); }
-        .th-card   { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 1rem; box-shadow: var(--shadow-card); }
-        .th-glass  { background: var(--bg-glass); backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid var(--border); }
-        .th-inset  { background: var(--bg-inset); }
-        .th-input  { background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-heading); border-radius: 0.75rem; transition: all 0.2s; }
-        .th-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 4px rgba(99,102,241,0.1); }
-        .th-heading{ color: var(--text-heading); }
-        .th-body   { color: var(--text-body); }
-        .th-muted  { color: var(--text-muted); }
-        .th-faint  { color: var(--text-faint); }
-        .th-border { border-color: var(--border); }
-        .th-hover:hover { background: var(--hover-bg); }
-        .th-select { background: var(--input-bg); border: 1px solid var(--input-border); color: var(--text-heading); border-radius: 0.75rem; }
+        /* ── Utility classes ── */
+        .bg-page{background:var(--bg-0)}.bg-card{background:var(--bg-1)}.bg-inset{background:var(--bg-2)}.bg-deep{background:var(--bg-3)}
+        .fg-0{color:var(--fg-0)}.fg-1{color:var(--fg-1)}.fg-2{color:var(--fg-2)}.fg-3{color:var(--fg-3)}
+        .border-t{border-color:var(--border)}.border-s{border-color:var(--border-s)}
+        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;box-shadow:var(--card-shadow)}
+        .card-h{transition:all .25s cubic-bezier(.4,0,.2,1)}.card-h:hover{box-shadow:var(--card-shadow-h);transform:translateY(-1px)}
+        .glass{background:var(--glass);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--border)}
+        .input-f{background:var(--bg-2);border:1px solid var(--border);color:var(--fg-0);border-radius:10px;transition:all .15s}
+        .input-f:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,.12)}
 
-        .card-hover { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
-        .card-hover:hover { box-shadow: var(--shadow-card-hover); border-color: rgba(99,102,241,0.3); transform: translateY(-2px); }
-        .stat-card { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
-        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
+        .pill-bar{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--bg-2)}
+        .pill{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--fg-2);cursor:pointer;border:none;background:transparent;transition:all .15s;white-space:nowrap}
+        .pill:hover{color:var(--fg-0)}.pill.on{background:#6366f1;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.35)}
 
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        .slide-up { animation: slideUp 0.5s ease-out; }
-        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        .fade{animation:fadeIn .35s ease-out}@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .spinner{border:2.5px solid var(--border);border-top-color:#6366f1;border-radius:50%;width:24px;height:24px;animation:sp .65s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+        .dot-pulse{width:6px;height:6px;border-radius:50%;background:#10b981;animation:dp 2s infinite}@keyframes dp{0%,100%{opacity:1}50%{opacity:.35}}
 
-        .pulse-dot { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        .spinner { border: 2px solid var(--border); border-top-color: #6366f1; border-radius: 50%; width: 28px; height: 28px; animation: spin .7s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* skeleton shimmer */
+        .skel{background:var(--bg-2);border-radius:8px;position:relative;overflow:hidden}
+        .skel::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);animation:shimmer 1.5s infinite}
+        @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+        html:not(.dark) .skel::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent)}
 
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
-        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        /* Logo fallback */
+        .logo-wrap{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;background:var(--bg-2);font-weight:700;font-size:14px;color:var(--fg-2)}
+        .logo-wrap.sm{width:28px;height:28px;border-radius:8px;font-size:11px}
+        .logo-wrap.lg{width:48px;height:48px;border-radius:12px;font-size:18px}
+        .logo-wrap img{width:100%;height:100%;object-fit:contain}
 
-        input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        .tv-chart-container { position: relative; }
+        /* Sentiment */
+        .sent{padding:2px 8px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+        .sent-pos{background:rgba(16,185,129,.12);color:#10b981}.sent-neg{background:rgba(239,68,68,.12);color:#ef4444}.sent-neu{background:rgba(100,116,139,.12);color:var(--fg-2)}
 
-        .fin-table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
-        .fin-table th, .fin-table td { padding: 10px 20px; white-space: nowrap; font-size: 13px; }
-        .fin-table thead th {
-            position: sticky; top: 0; z-index: 2;
-            background: var(--bg-surface); border-bottom: 2px solid var(--border);
-            color: var(--text-muted); font-weight: 500; text-align: right;
-        }
-        .fin-table thead th:first-child { text-align: left; left: 0; z-index: 3; }
-        .fin-table tbody td { border-bottom: 1px solid var(--border-subtle); color: var(--text-heading); text-align: right; }
-        .fin-table tbody td:first-child {
-            position: sticky; left: 0; z-index: 1;
-            background: var(--bg-surface); text-align: left;
-            color: var(--text-body); font-weight: 400;
-        }
-        .fin-table tbody tr:nth-child(even) td { background: var(--row-alt); }
-        .fin-table tbody tr:nth-child(even) td:first-child { background: var(--bg-surface); }
-        .fin-table tbody tr:hover td { background: var(--hover-bg); }
-        .fin-table tbody tr:hover td:first-child { background: var(--hover-bg); }
-        .fin-val-negative { color: #ef4444; }
-        .fin-section-row td {
-            background: var(--bg-inset) !important;
-            border-bottom: 1px solid var(--border) !important;
-        }
-        .fin-section-cell {
-            color: var(--text-muted) !important;
-            font-weight: 600 !important;
-            font-size: 11px !important;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding-top: 16px !important;
-            padding-bottom: 8px !important;
-        }
-        .fin-table tbody tr:first-child.fin-section-row td { padding-top: 10px !important; }
+        /* Score ring */
+        .ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
+        .ring svg{transform:rotate(-90deg)}.ring .rv{position:absolute;font-weight:800}
 
-        .pill-group { display: inline-flex; gap: 2px; padding: 3px; border-radius: 0.75rem; background: var(--bg-inset); }
-        .pill-btn {
-            padding: 6px 14px; border-radius: 0.5rem; font-size: 13px; font-weight: 500;
-            color: var(--text-muted); cursor: pointer; border: none; background: transparent;
-            transition: all 0.2s;
-        }
-        .pill-btn:hover { color: var(--text-heading); }
-        .pill-btn.active { background: #6366f1; color: #ffffff; box-shadow: 0 2px 8px rgba(99,102,241,0.3); }
+        /* Scrollbar */
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg-2)}::-webkit-scrollbar-thumb{background:var(--fg-3);border-radius:3px}
 
-        .score-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-        .score-ring svg { transform: rotate(-90deg); }
-        .score-ring .score-text { position: absolute; font-weight: 800; }
+        /* Fin table */
+        .ft{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+        .ft th,.ft td{padding:10px 18px;white-space:nowrap;font-size:13px}
+        .ft thead th{position:sticky;top:0;z-index:2;background:var(--bg-1);border-bottom:2px solid var(--border);color:var(--fg-2);font-weight:500;text-align:right}
+        .ft thead th:first-child{text-align:left;left:0;z-index:3}
+        .ft tbody td{border-bottom:1px solid var(--border-s);color:var(--fg-0);text-align:right}
+        .ft tbody td:first-child{position:sticky;left:0;z-index:1;background:var(--bg-1);text-align:left;color:var(--fg-1);font-weight:400}
+        .ft tbody tr:hover td{background:var(--bg-2)}.ft tbody tr:hover td:first-child{background:var(--bg-2)}
+        .ft .neg{color:#ef4444}
+        .ft .sec td{background:var(--bg-2)!important;border-bottom:1px solid var(--border)!important}
+        .ft .sec-label{color:var(--fg-2)!important;font-weight:600!important;font-size:11px!important;text-transform:uppercase;letter-spacing:.05em;padding-top:14px!important;padding-bottom:6px!important}
 
-        .logo-img { width: 32px; height: 32px; border-radius: 8px; object-fit: contain; background: var(--bg-inset); }
-        .logo-img-sm { width: 24px; height: 24px; border-radius: 6px; object-fit: contain; background: var(--bg-inset); }
-        .logo-img-lg { width: 48px; height: 48px; border-radius: 12px; object-fit: contain; background: var(--bg-inset); }
+        input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 
-        .sentiment-badge { padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
-        .sentiment-positive { background: rgba(16,185,129,0.1); color: #10b981; }
-        .sentiment-negative { background: rgba(239,68,68,0.1); color: #ef4444; }
-        .sentiment-neutral { background: rgba(100,116,139,0.1); color: #64748b; }
-
-        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-
-        .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-
-        .nav-indicator { position: absolute; left: 0; width: 3px; height: 24px; background: #6366f1; border-radius: 0 4px 4px 0; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
-
-        @media (max-width: 768px) {
-            .sidebar-desktop { display: none; }
-            .mobile-bottom-nav { display: flex; }
-        }
-        @media (min-width: 769px) {
-            .mobile-bottom-nav { display: none; }
-        }
+        /* Mobile bottom nav */
+        @media(max-width:768px){.side{display:none}.bnav{display:flex}}
+        @media(min-width:769px){.bnav{display:none}}
     </style>
 </head>
 
-<body class="th-page min-h-screen" x-data="app()" x-init="init()">
-
+<body class="bg-page fg-1 min-h-screen" x-data="app()" x-init="init()">
 <div class="flex h-screen overflow-hidden">
-    <!-- SIDEBAR -->
-    <aside class="w-64 th-sidebar border-r flex flex-col flex-shrink-0 sidebar-desktop">
-        <div class="px-5 py-5 th-border border-b">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-gradient-to-br from-brand-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-base font-bold th-heading tracking-tight">InvestorHub</h1>
-                    <p class="text-[9px] th-faint uppercase tracking-[0.2em] mt-0.5">Smart Analytics</p>
-                </div>
+
+<!-- ─── SIDEBAR ─── -->
+<aside class="side w-[252px] bg-card border-r flex flex-col flex-shrink-0" style="border-color:var(--border)">
+    <div class="px-5 py-4" style="border-bottom:1px solid var(--border)">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/25">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </div>
+            <div>
+                <h1 class="text-[15px] font-bold fg-0 tracking-tight">InvestorHub</h1>
+                <p class="text-[9px] fg-3 uppercase tracking-[.2em] mt-px">Analytics Platform</p>
             </div>
         </div>
-
-        <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
-            <template x-for="item in navItems" :key="item.id">
-                <button @click="navigate(item.id)"
-                    :class="currentPage === item.id
-                        ? 'bg-brand-500/10 text-brand-500 font-semibold'
-                        : 'th-muted th-hover'"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all relative">
-                    <span x-html="item.icon" class="w-[18px] h-[18px] flex-shrink-0"></span>
-                    <span x-text="item.label"></span>
-                    <span x-show="currentPage === item.id" class="absolute right-3 w-1.5 h-1.5 rounded-full bg-brand-500"></span>
-                </button>
-            </template>
-        </nav>
-
-        <!-- User Section -->
-        <div class="px-4 py-3 th-border border-t">
-            <div x-show="!authToken" class="space-y-2">
-                <button @click="showLoginModal = true" class="w-full px-3 py-2 bg-brand-600 text-white rounded-xl text-[13px] font-medium hover:bg-brand-700 transition-all shadow-sm">
-                    Sign In
-                </button>
-                <button @click="showRegisterModal = true" class="w-full px-3 py-2 text-brand-500 border border-brand-500/30 rounded-xl text-[13px] font-medium hover:bg-brand-500/10 transition-all">
-                    Create Account
-                </button>
-            </div>
-            <div x-show="authToken" x-cloak class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold" x-text="currentUser?.name?.charAt(0)?.toUpperCase() || currentUser?.email?.charAt(0)?.toUpperCase() || 'U'"></div>
-                <div class="flex-1 min-w-0">
-                    <div class="text-[12px] font-medium th-heading truncate" x-text="currentUser?.name || currentUser?.email"></div>
-                    <button @click="logout()" class="text-[10px] text-red-400 hover:text-red-300 font-medium">Sign Out</button>
-                </div>
+    </div>
+    <nav class="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
+        <template x-for="item in navItems" :key="item.id">
+            <button @click="navigate(item.id)"
+                :class="currentPage===item.id?'bg-brand-500/10 text-brand-400 font-semibold':'fg-2 hover:bg-[var(--bg-2)]'"
+                class="w-full flex items-center gap-3 px-3 py-[9px] rounded-[10px] text-[13px] font-medium transition-all">
+                <span x-html="item.icon" class="w-[18px] h-[18px] flex-shrink-0"></span>
+                <span x-text="item.label"></span>
+            </button>
+        </template>
+    </nav>
+    <!-- Auth -->
+    <div class="px-3 py-3" style="border-top:1px solid var(--border)">
+        <div x-show="!authToken" class="space-y-2">
+            <button @click="showLoginModal=true" class="w-full px-3 py-2 bg-brand-600 text-white rounded-[10px] text-[13px] font-medium hover:bg-brand-700 transition">Sign In</button>
+            <button @click="showRegisterModal=true" class="w-full px-3 py-2 fg-2 border rounded-[10px] text-[13px] font-medium hover:bg-[var(--bg-2)] transition" style="border-color:var(--border)">Create Account</button>
+        </div>
+        <div x-show="authToken" x-cloak class="flex items-center gap-2.5">
+            <div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-violet-600 rounded-full flex items-center justify-center text-white text-xs font-bold" x-text="(currentUser?.name||currentUser?.email||'U').charAt(0).toUpperCase()"></div>
+            <div class="flex-1 min-w-0">
+                <div class="text-[12px] font-semibold fg-0 truncate" x-text="currentUser?.name||currentUser?.email"></div>
+                <button @click="logout()" class="text-[10px] text-red-400 hover:text-red-300 font-medium">Sign Out</button>
             </div>
         </div>
+    </div>
+    <div class="px-4 py-2.5" style="border-top:1px solid var(--border)">
+        <div class="flex items-center gap-2 text-[10px] fg-3"><div class="dot-pulse"></div><span>Live Data</span></div>
+    </div>
+</aside>
 
-        <div class="px-4 py-3 th-border border-t">
-            <div class="flex items-center gap-2 text-[11px] th-faint">
-                <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot"></div>
-                <span>Live Market Data</span>
-            </div>
-        </div>
-    </aside>
-
-    <!-- MAIN -->
-    <main class="flex-1 overflow-y-auto pb-20 md:pb-0">
-        <!-- Top Bar -->
-        <header class="sticky top-0 z-30 th-glass px-4 md:px-6 py-2.5 flex items-center justify-between">
-            <div class="flex items-center gap-4 flex-1">
-                <div class="relative w-full max-w-md">
-                    <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 th-faint pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <input type="text" x-model="searchQuery"
-                        @input.debounce.400ms="searchStocks()"
-                        @focus="showSearchDropdown = true"
-                        @click.outside="showSearchDropdown = false"
-                        placeholder="Search stocks, ETFs, crypto..."
-                        class="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm th-input">
-                    <div x-show="showSearchDropdown && searchResults.length > 0" x-cloak
-                        class="absolute top-full left-0 right-0 mt-2 th-card shadow-xl overflow-hidden z-50 max-h-80 overflow-y-auto">
-                        <template x-for="result in searchResults" :key="result.symbol">
-                            <button @click="selectStock(result.symbol); showSearchDropdown = false; searchQuery = ''"
-                                class="w-full flex items-center justify-between px-4 py-3 th-hover transition text-left border-b last:border-0" style="border-color:var(--border-subtle)">
-                                <div class="flex items-center gap-3">
-                                    <img :src="getLogoUrl(result.symbol)" class="logo-img-sm" onerror="this.style.display='none'">
-                                    <div>
-                                        <span class="text-sm font-semibold th-heading" x-text="result.symbol"></span>
-                                        <span class="text-xs th-muted ml-2" x-text="result.name"></span>
-                                    </div>
-                                </div>
-                                <span class="text-[10px] th-faint px-2 py-0.5 rounded-full th-inset font-medium" x-text="result.type"></span>
-                            </button>
-                        </template>
-                    </div>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <button @click="toggleTheme()" class="p-2 rounded-xl th-hover transition" title="Toggle theme">
-                    <svg x-show="darkMode" x-cloak class="w-[18px] h-[18px] text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                    <svg x-show="!darkMode" class="w-[18px] h-[18px] th-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-                </button>
-                <div x-show="!authToken" class="hidden md:flex items-center gap-2">
-                    <button @click="showLoginModal = true" class="text-[12px] text-brand-500 hover:text-brand-400 font-medium">Sign In</button>
-                </div>
-                <span class="text-[11px] th-faint hidden lg:inline" x-text="new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})"></span>
-            </div>
-        </header>
-
-        <div class="p-4 md:p-6 max-w-[1400px] mx-auto">
-
-            <!-- DASHBOARD -->
-            <div x-show="currentPage === 'dashboard'" x-cloak class="fade-in">
-                <div class="mb-8">
-                    <h2 class="text-2xl md:text-3xl font-bold th-heading tracking-tight">Dashboard</h2>
-                    <p class="text-sm th-muted mt-1">Market overview & portfolio snapshot</p>
-                </div>
-
-                <!-- Market Indices -->
-                <div class="mb-8">
-                    <h3 class="text-[11px] font-semibold th-faint uppercase tracking-wider mb-3">Markets</h3>
-                    <div x-show="marketLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
-                    <div x-show="!marketLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                        <template x-for="idx in marketData" :key="idx.symbol">
-                            <div class="th-card stat-card card-hover p-4 cursor-pointer" @click="selectStock(idx.symbol)">
-                                <div class="text-[11px] th-muted mb-1.5 font-medium" x-text="idx.name"></div>
-                                <div class="text-lg font-bold th-heading leading-tight" x-text="formatPrice(idx.price)"></div>
-                                <div class="flex items-center gap-1.5 mt-1.5">
-                                    <span :class="idx.change >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-sm font-semibold">
-                                        <span x-text="idx.change >= 0 ? '+' : ''"></span><span x-text="idx.change?.toFixed(2)"></span>
-                                    </span>
-                                    <span :class="idx.changePercent >= 0 ? 'text-emerald-500/60' : 'text-red-500/60'" class="text-[11px]">
-                                        (<span x-text="idx.changePercent >= 0 ? '+' : ''"></span><span x-text="idx.changePercent?.toFixed(2)"></span>%)
-                                    </span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <!-- Watchlist + Portfolio Summary -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="th-card p-5">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-[11px] font-semibold th-faint uppercase tracking-wider">Watchlist</h3>
-                            <div class="flex gap-2" x-data="{ adding: false, sym: '' }">
-                                <div x-show="adding" class="flex gap-2">
-                                    <input x-model="sym" @keydown.enter="addToWatchlist(sym); sym=''; adding=false"
-                                        placeholder="AAPL" class="w-20 px-2 py-1.5 text-xs rounded-lg th-input">
-                                    <button @click="addToWatchlist(sym); sym=''; adding=false" class="text-xs bg-brand-600 text-white px-3 py-1.5 rounded-lg hover:bg-brand-700 transition">Add</button>
-                                </div>
-                                <button @click="adding = !adding" class="text-xs text-brand-500 hover:text-brand-400 font-medium">
-                                    <span x-text="adding ? 'Cancel' : '+ Add'"></span>
-                                </button>
-                            </div>
+<!-- ─── MAIN ─── -->
+<main class="flex-1 overflow-y-auto pb-20 md:pb-0">
+    <!-- Top bar -->
+    <header class="sticky top-0 z-30 glass px-4 md:px-6 py-2 flex items-center justify-between gap-4">
+        <div class="relative flex-1 max-w-lg">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 fg-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" x-model="searchQuery" @input.debounce.400ms="searchStocks()" @focus="showSearchDropdown=true" @click.outside="showSearchDropdown=false"
+                placeholder="Search stocks, ETFs, crypto..." class="w-full pl-9 pr-3 py-2 rounded-[10px] text-sm input-f">
+            <div x-show="showSearchDropdown&&searchResults.length" x-cloak class="absolute top-full left-0 right-0 mt-1.5 card shadow-xl z-50 max-h-72 overflow-y-auto">
+                <template x-for="r in searchResults" :key="r.symbol">
+                    <button @click="selectStock(r.symbol);showSearchDropdown=false;searchQuery=''"
+                        class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-2)] transition text-left" style="border-bottom:1px solid var(--border-s)">
+                        <div class="logo-wrap sm" x-data="{ok:true}">
+                            <img x-show="ok" :src="logoUrl(r.symbol)" @error="ok=false">
+                            <span x-show="!ok" x-text="r.symbol.charAt(0)"></span>
                         </div>
-                        <div x-show="watchlistLoading" class="flex justify-center py-4"><div class="spinner"></div></div>
-                        <div x-show="!watchlistLoading && watchlist.length === 0" class="text-sm th-faint text-center py-6">
-                            Add stocks to your watchlist
+                        <div class="flex-1 min-w-0">
+                            <span class="text-sm font-semibold fg-0" x-text="r.symbol"></span>
+                            <span class="text-xs fg-2 ml-1.5 truncate" x-text="r.name"></span>
                         </div>
-                        <div x-show="!watchlistLoading && watchlist.length > 0" class="space-y-0.5">
-                            <template x-for="item in watchlist" :key="item.symbol">
-                                <div class="flex items-center justify-between py-2.5 px-3 rounded-xl th-hover cursor-pointer group transition"
-                                    @click="selectStock(item.symbol)">
-                                    <div class="flex items-center gap-2.5">
-                                        <img :src="getLogoUrl(item.symbol)" class="logo-img-sm" onerror="this.style.display='none'">
-                                        <div>
-                                            <span class="text-sm font-semibold th-heading" x-text="item.symbol"></span>
-                                            <span class="text-[11px] th-faint ml-1.5 hidden md:inline" x-text="item.name"></span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <div class="text-right">
-                                            <div class="text-sm font-medium th-heading" x-text="formatPrice(item.price)"></div>
-                                            <div :class="item.changePercent >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-[11px] font-medium">
-                                                <span x-text="item.changePercent >= 0 ? '+' : ''"></span><span x-text="item.changePercent?.toFixed(2)"></span>%
-                                            </div>
-                                        </div>
-                                        <button @click.stop="removeFromWatchlist(item.symbol)" class="opacity-0 group-hover:opacity-100 th-faint hover:text-red-500 transition">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <div class="th-card p-5">
-                        <h3 class="text-[11px] font-semibold th-faint uppercase tracking-wider mb-4">Portfolio Summary</h3>
-                        <div x-show="portfolioLoading" class="flex justify-center py-4"><div class="spinner"></div></div>
-                        <div x-show="!portfolioLoading && portfolio.length === 0" class="text-sm th-faint text-center py-6">
-                            <template x-if="!authToken">
-                                <div>
-                                    <p class="mb-2">Sign in to track your portfolio</p>
-                                    <button @click="showLoginModal = true" class="text-brand-500 hover:text-brand-400 font-medium text-xs">Sign In</button>
-                                </div>
-                            </template>
-                            <template x-if="authToken">
-                                <p>Add holdings in the Portfolio tab</p>
-                            </template>
-                        </div>
-                        <div x-show="!portfolioLoading && portfolio.length > 0">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div class="th-inset rounded-xl p-3">
-                                    <div class="text-[11px] th-muted font-medium">Total Value</div>
-                                    <div class="text-xl font-bold th-heading mt-0.5" x-text="'$' + portfolioTotalValue().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div>
-                                </div>
-                                <div class="th-inset rounded-xl p-3">
-                                    <div class="text-[11px] th-muted font-medium">Total P&L</div>
-                                    <div :class="portfolioTotalPL() >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-xl font-bold mt-0.5">
-                                        <span x-text="portfolioTotalPL() >= 0 ? '+' : ''"></span>$<span x-text="Math.abs(portfolioTotalPL()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div id="portfolio-pie-chart"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- NEWS -->
-            <div x-show="currentPage === 'news'" x-cloak class="fade-in">
-                <div class="mb-6">
-                    <h2 class="text-2xl md:text-3xl font-bold th-heading tracking-tight">Market News</h2>
-                    <p class="text-sm th-muted mt-1">Latest headlines with AI sentiment analysis</p>
-                </div>
-
-                <div x-show="newsLoading" class="flex justify-center py-12"><div class="spinner"></div></div>
-                <div x-show="!newsLoading">
-                    <!-- Sentiment Overview -->
-                    <div class="grid grid-cols-3 gap-3 mb-6" x-show="marketNews.length > 0">
-                        <div class="th-card p-4 text-center">
-                            <div class="text-2xl font-bold text-emerald-500" x-text="marketNews.filter(n => n.sentiment?.label === 'positive').length"></div>
-                            <div class="text-[11px] th-muted mt-1 font-medium">Positive</div>
-                        </div>
-                        <div class="th-card p-4 text-center">
-                            <div class="text-2xl font-bold th-muted" x-text="marketNews.filter(n => n.sentiment?.label === 'neutral').length"></div>
-                            <div class="text-[11px] th-muted mt-1 font-medium">Neutral</div>
-                        </div>
-                        <div class="th-card p-4 text-center">
-                            <div class="text-2xl font-bold text-red-500" x-text="marketNews.filter(n => n.sentiment?.label === 'negative').length"></div>
-                            <div class="text-[11px] th-muted mt-1 font-medium">Negative</div>
-                        </div>
-                    </div>
-
-                    <!-- News List -->
-                    <div class="space-y-3">
-                        <template x-for="(article, idx) in marketNews" :key="idx">
-                            <a :href="article.link" target="_blank" rel="noopener" class="th-card card-hover p-4 flex gap-4 items-start block">
-                                <img x-show="article.thumbnail" :src="article.thumbnail" class="w-20 h-14 md:w-28 md:h-20 rounded-lg object-cover flex-shrink-0" onerror="this.style.display='none'">
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex items-start justify-between gap-3">
-                                        <h4 class="text-sm font-semibold th-heading line-clamp-2 leading-snug" x-text="article.title"></h4>
-                                        <span class="sentiment-badge flex-shrink-0"
-                                            :class="'sentiment-' + article.sentiment?.label"
-                                            x-text="article.sentiment?.label"></span>
-                                    </div>
-                                    <div class="flex items-center gap-3 mt-2 text-[11px] th-muted">
-                                        <span x-text="article.publisher"></span>
-                                        <span x-text="formatNewsDate(article.publishedAt)"></span>
-                                        <span x-show="article.relatedSymbol && !article.relatedSymbol.startsWith('^')" class="text-brand-500 font-medium" x-text="article.relatedSymbol"></span>
-                                    </div>
-                                </div>
-                            </a>
-                        </template>
-                    </div>
-                    <div x-show="marketNews.length === 0 && !newsLoading" class="text-center py-12 th-muted text-sm">
-                        No news available at the moment
-                    </div>
-                </div>
-            </div>
-
-            <!-- ANALYSIS -->
-            <div x-show="currentPage === 'analysis'" x-cloak class="fade-in">
-                <div class="mb-6">
-                    <h2 class="text-2xl md:text-3xl font-bold th-heading tracking-tight">Stock Analysis</h2>
-                    <p class="text-sm th-muted mt-1">Fundamentals, technicals, AI scoring & financial statements</p>
-                </div>
-
-                <div class="flex items-center gap-3 mb-6">
-                    <input type="text" x-model="analysisSymbol" @keydown.enter="loadAnalysis(analysisSymbol)"
-                        placeholder="Enter ticker (e.g. AAPL)"
-                        class="px-4 py-2.5 rounded-xl text-sm th-input w-48 uppercase" style="text-transform:uppercase">
-                    <button @click="loadAnalysis(analysisSymbol)"
-                        class="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm hover:shadow-lg hover:shadow-brand-500/20 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        Analyze
+                        <span class="text-[10px] fg-3 bg-inset px-2 py-0.5 rounded-full font-medium" x-text="r.type"></span>
                     </button>
-                    <div x-show="analysisLoading" class="spinner"></div>
+                </template>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button @click="toggleTheme()" class="p-2 rounded-[10px] hover:bg-[var(--bg-2)] transition">
+                <svg x-show="darkMode" x-cloak class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg x-show="!darkMode" class="w-4 h-4 fg-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            </button>
+            <span class="text-[11px] fg-3 hidden lg:inline" x-text="new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})"></span>
+        </div>
+    </header>
+
+    <div class="p-4 md:p-6 lg:p-8 max-w-[1360px] mx-auto">
+
+    <!-- ───────── DASHBOARD ───────── -->
+    <div x-show="currentPage==='dashboard'" x-cloak class="fade">
+        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-6">Dashboard</h2>
+        <!-- Market indices -->
+        <div class="mb-8">
+            <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-3">Markets</div>
+            <!-- skeleton -->
+            <div x-show="marketLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <template x-for="i in 5"><div class="skel h-[88px]"></div></template>
+            </div>
+            <div x-show="!marketLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <template x-for="m in marketData" :key="m.symbol">
+                    <div class="card card-h p-4 cursor-pointer" @click="selectStock(m.symbol)">
+                        <div class="text-[11px] fg-2 font-medium mb-1" x-text="m.name"></div>
+                        <div class="text-[17px] font-bold fg-0 tabular-nums" x-text="fmtP(m.price)"></div>
+                        <div class="flex items-center gap-1 mt-1">
+                            <span :class="m.change>=0?'text-emerald-500':'text-red-500'" class="text-[13px] font-semibold tabular-nums">
+                                <span x-text="m.change>=0?'+':''"></span><span x-text="m.changePercent?.toFixed(2)"></span>%
+                            </span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        <!-- Watchlist + Portfolio -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <!-- Watchlist -->
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold">Watchlist</div>
+                    <div x-data="{add:false,sym:''}" class="flex gap-2">
+                        <div x-show="add" class="flex gap-2">
+                            <input x-model="sym" @keydown.enter="addToWatchlist(sym);sym='';add=false" placeholder="AAPL" class="w-20 px-2 py-1 text-xs rounded-lg input-f">
+                            <button @click="addToWatchlist(sym);sym='';add=false" class="text-xs bg-brand-600 text-white px-2.5 py-1 rounded-lg">Add</button>
+                        </div>
+                        <button @click="add=!add" class="text-xs text-brand-400 hover:text-brand-300 font-medium" x-text="add?'Cancel':'+ Add'"></button>
+                    </div>
                 </div>
-
-                <div x-show="analysisData" x-cloak>
-                    <!-- Stock Header with Logo -->
-                    <div class="th-card p-5 mb-5">
-                        <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                            <div class="flex items-start gap-4">
-                                <img :src="getLogoUrl(analysisData?.symbol)" class="logo-img-lg" onerror="this.style.display='none'">
+                <div x-show="watchlistLoading" class="space-y-2"><template x-for="i in 3"><div class="skel h-10"></div></template></div>
+                <div x-show="!watchlistLoading&&!watchlist.length" class="text-sm fg-3 text-center py-8">Add stocks to track</div>
+                <div x-show="!watchlistLoading&&watchlist.length" class="space-y-px">
+                    <template x-for="w in watchlist" :key="w.symbol">
+                        <div class="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-[var(--bg-2)] cursor-pointer group transition" @click="selectStock(w.symbol)">
+                            <div class="flex items-center gap-2.5">
+                                <div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(w.symbol)" @error="ok=false"><span x-show="!ok" x-text="w.symbol.charAt(0)"></span></div>
                                 <div>
-                                    <div class="flex items-center gap-3 mb-1.5 flex-wrap">
-                                        <h3 class="text-xl font-bold th-heading" x-text="analysisData?.name"></h3>
-                                        <span class="text-xs th-faint th-inset px-2 py-0.5 rounded-lg font-medium" x-text="analysisData?.symbol"></span>
-                                        <button @click="addToWatchlist(analysisData?.symbol)" class="text-[11px] text-brand-500 hover:text-brand-400 border border-brand-500/30 px-2.5 py-0.5 rounded-lg hover:bg-brand-500/10 transition font-medium">+ Watch</button>
-                                    </div>
-                                    <div class="flex items-center gap-2 text-[13px] th-muted">
-                                        <span x-text="analysisData?.sector"></span>
-                                        <span class="th-faint">|</span>
-                                        <span x-text="analysisData?.industry"></span>
-                                    </div>
+                                    <div class="text-[13px] font-semibold fg-0" x-text="w.symbol"></div>
+                                    <div class="text-[11px] fg-3 truncate max-w-[120px]" x-text="w.name"></div>
                                 </div>
                             </div>
-                            <div class="text-right">
-                                <div class="text-3xl font-bold th-heading tracking-tight" x-text="formatPrice(analysisData?.price)"></div>
-                                <div class="flex items-center justify-end gap-2 mt-1">
-                                    <span :class="analysisData?.change >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-base font-semibold">
-                                        <span x-text="analysisData?.change >= 0 ? '+' : ''"></span><span x-text="analysisData?.change?.toFixed(2)"></span>
-                                    </span>
-                                    <span :class="analysisData?.changePercent >= 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'"
-                                        class="text-[13px] px-2.5 py-0.5 rounded-full font-semibold">
-                                        <span x-text="analysisData?.changePercent >= 0 ? '+' : ''"></span><span x-text="analysisData?.changePercent?.toFixed(2)"></span>%
-                                    </span>
+                            <div class="flex items-center gap-2">
+                                <div class="text-right">
+                                    <div class="text-[13px] font-medium fg-0 tabular-nums" x-text="fmtP(w.price)"></div>
+                                    <div :class="w.changePercent>=0?'text-emerald-500':'text-red-500'" class="text-[11px] font-semibold tabular-nums"><span x-text="w.changePercent>=0?'+':''"></span><span x-text="w.changePercent?.toFixed(2)"></span>%</div>
                                 </div>
+                                <button @click.stop="removeFromWatchlist(w.symbol)" class="opacity-0 group-hover:opacity-100 fg-3 hover:text-red-400 transition"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                             </div>
                         </div>
+                    </template>
+                </div>
+            </div>
+            <!-- Portfolio summary -->
+            <div class="card p-5">
+                <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-4">Portfolio</div>
+                <div x-show="portfolioLoading" class="space-y-3"><div class="skel h-16"></div><div class="skel h-16"></div></div>
+                <div x-show="!portfolioLoading&&!portfolio.length" class="text-center py-8">
+                    <p class="text-sm fg-3 mb-2" x-text="authToken?'Add holdings in Portfolio tab':'Sign in to track your portfolio'"></p>
+                    <button x-show="!authToken" @click="showLoginModal=true" class="text-xs text-brand-400 font-medium">Sign In</button>
+                </div>
+                <div x-show="!portfolioLoading&&portfolio.length">
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Value</div><div class="text-lg font-bold fg-0 mt-0.5 tabular-nums" x-text="'$'+ptv().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">P&L</div><div :class="ptp()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-0.5 tabular-nums"><span x-text="ptp()>=0?'+':'-'"></span>$<span x-text="Math.abs(ptp()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
                     </div>
+                    <div id="dash-pie"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    <!-- AI Score Card -->
-                    <div x-show="stockScore" class="th-card p-5 mb-5 slide-up">
-                        <div class="flex items-center gap-3 mb-4">
-                            <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                            <h4 class="text-sm font-semibold th-heading">AI Health Score</h4>
-                            <span class="text-[11px] px-2 py-0.5 rounded-full font-bold"
-                                :class="{
-                                    'bg-emerald-500/10 text-emerald-500': stockScore?.rating === 'Strong Buy' || stockScore?.rating === 'Buy',
-                                    'bg-amber-500/10 text-amber-500': stockScore?.rating === 'Hold',
-                                    'bg-red-500/10 text-red-500': stockScore?.rating === 'Sell' || stockScore?.rating === 'Strong Sell'
-                                }"
-                                x-text="stockScore?.rating"></span>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                            <div class="text-center">
-                                <div class="score-ring mx-auto mb-2">
-                                    <svg width="64" height="64" viewBox="0 0 64 64">
-                                        <circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="4" class="th-faint opacity-20"/>
-                                        <circle cx="32" cy="32" r="28" fill="none" stroke-width="4"
-                                            :stroke="getScoreColor(stockScore?.overallScore)"
-                                            :stroke-dasharray="175.9"
-                                            :stroke-dashoffset="175.9 - (175.9 * (stockScore?.overallScore || 0) / 10)"
-                                            stroke-linecap="round"/>
-                                    </svg>
-                                    <span class="score-text text-lg th-heading" x-text="stockScore?.overallScore?.toFixed(1)"></span>
-                                </div>
-                                <div class="text-[10px] th-muted font-semibold uppercase tracking-wider">Overall</div>
+    <!-- ───────── NEWS ───────── -->
+    <div x-show="currentPage==='news'" x-cloak class="fade">
+        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Market News</h2>
+        <p class="text-[13px] fg-2 mb-6">Headlines with AI sentiment analysis</p>
+        <div x-show="newsLoading" class="space-y-3"><template x-for="i in 5"><div class="skel h-24"></div></template></div>
+        <div x-show="!newsLoading">
+            <!-- sentiment bar -->
+            <div class="grid grid-cols-3 gap-3 mb-5" x-show="marketNews.length">
+                <div class="card p-3 text-center"><div class="text-xl font-bold text-emerald-500" x-text="marketNews.filter(n=>n.sentiment?.label==='positive').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Bullish</div></div>
+                <div class="card p-3 text-center"><div class="text-xl font-bold fg-2" x-text="marketNews.filter(n=>n.sentiment?.label==='neutral').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Neutral</div></div>
+                <div class="card p-3 text-center"><div class="text-xl font-bold text-red-500" x-text="marketNews.filter(n=>n.sentiment?.label==='negative').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Bearish</div></div>
+            </div>
+            <div class="space-y-2.5">
+                <template x-for="(a,i) in marketNews" :key="i">
+                    <a :href="a.link" target="_blank" rel="noopener" class="card card-h p-4 flex gap-4 items-start block">
+                        <img x-show="a.thumbnail" :src="a.thumbnail" class="w-24 h-16 rounded-lg object-cover flex-shrink-0" onerror="this.style.display='none'" loading="lazy">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-start justify-between gap-3">
+                                <h4 class="text-[13px] font-semibold fg-0 leading-snug line-clamp-2" x-text="a.title"></h4>
+                                <span class="sent flex-shrink-0" :class="a.sentiment?.label==='positive'?'sent-pos':a.sentiment?.label==='negative'?'sent-neg':'sent-neu'" x-text="a.sentiment?.label"></span>
                             </div>
-                            <template x-for="(score, key) in stockScore?.scores || {}" :key="key">
-                                <div class="text-center">
-                                    <div class="score-ring mx-auto mb-2">
-                                        <svg width="52" height="52" viewBox="0 0 52 52">
-                                            <circle cx="26" cy="26" r="22" fill="none" stroke="currentColor" stroke-width="3" class="th-faint opacity-20"/>
-                                            <circle cx="26" cy="26" r="22" fill="none" stroke-width="3"
-                                                :stroke="getScoreColor(score)"
-                                                :stroke-dasharray="138.2"
-                                                :stroke-dashoffset="138.2 - (138.2 * score / 10)"
-                                                stroke-linecap="round"/>
-                                        </svg>
-                                        <span class="score-text text-sm th-heading" x-text="score?.toFixed(1)"></span>
-                                    </div>
-                                    <div class="text-[10px] th-muted font-medium capitalize" x-text="key.replace(/([A-Z])/g, ' $1').trim()"></div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-9 gap-2 mb-5">
-                        <template x-for="stat in analysisStats" :key="stat.label">
-                            <div class="th-card p-3">
-                                <div class="text-[10px] th-faint uppercase tracking-wider leading-tight" x-text="stat.label"></div>
-                                <div class="text-[13px] font-semibold th-heading mt-1" x-text="stat.value"></div>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div class="pill-group mb-5 overflow-x-auto">
-                        <template x-for="tab in ['Price Chart', 'Technicals', 'Fundamentals', 'Financials', 'News', 'Profile']" :key="tab">
-                            <button @click="switchAnalysisTab(tab)"
-                                :class="analysisTab === tab ? 'active' : ''"
-                                class="pill-btn whitespace-nowrap" x-text="tab">
-                            </button>
-                        </template>
-                    </div>
-
-                    <!-- Price Chart Tab -->
-                    <div x-show="analysisTab === 'Price Chart'" class="th-card p-5 fade-in">
-                        <div class="flex items-center justify-between mb-4">
-                            <h4 class="text-sm font-semibold th-heading">Price History</h4>
-                            <div class="pill-group">
-                                <template x-for="p in ['1mo','3mo','6mo','1y','2y','5y']" :key="p">
-                                    <button @click="chartPeriod = p; loadPriceChart(analysisData?.symbol)"
-                                        :class="chartPeriod === p ? 'active' : ''"
-                                        class="pill-btn !py-1 !px-2.5 !text-[11px]" x-text="p">
-                                    </button>
-                                </template>
+                            <div class="flex items-center gap-3 mt-2 text-[11px] fg-3">
+                                <span x-text="a.publisher"></span>
+                                <span x-text="timeAgo(a.publishedAt)"></span>
                             </div>
                         </div>
-                        <div id="tv-price-chart" class="tv-chart-container w-full" style="height:420px;"></div>
-                    </div>
+                    </a>
+                </template>
+            </div>
+            <div x-show="!marketNews.length&&!newsLoading" class="text-center py-16 fg-3 text-sm">No news available</div>
+        </div>
+    </div>
 
-                    <!-- Technicals Tab -->
-                    <div x-show="analysisTab === 'Technicals'" class="space-y-4 fade-in">
-                        <div class="th-card p-5">
-                            <div class="flex items-center justify-between mb-4">
-                                <h4 class="text-sm font-semibold th-heading">Moving Averages & Bollinger Bands</h4>
-                                <div class="pill-group">
-                                    <template x-for="p in ['3mo','6mo','1y','2y']" :key="p">
-                                        <button @click="technicalPeriod = p; loadTechnicals(analysisData?.symbol)"
-                                            :class="technicalPeriod === p ? 'active' : ''"
-                                            class="pill-btn !py-1 !px-2.5 !text-[11px]" x-text="p">
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                            <div id="tv-tech-ma" class="tv-chart-container" style="height:360px;"></div>
-                        </div>
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <div class="th-card p-5">
-                                <h4 class="text-sm font-semibold th-heading mb-3">RSI (14)</h4>
-                                <div id="tv-tech-rsi" class="tv-chart-container" style="height:220px;"></div>
-                            </div>
-                            <div class="th-card p-5">
-                                <h4 class="text-sm font-semibold th-heading mb-3">MACD</h4>
-                                <div id="tv-tech-macd" class="tv-chart-container" style="height:220px;"></div>
-                            </div>
-                        </div>
-                    </div>
+    <!-- ───────── ANALYSIS ───────── -->
+    <div x-show="currentPage==='analysis'" x-cloak class="fade">
+        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Stock Analysis</h2>
+        <p class="text-[13px] fg-2 mb-5">Fundamentals, technicals, AI scoring & financials</p>
 
-                    <!-- Fundamentals Tab -->
-                    <div x-show="analysisTab === 'Fundamentals'" class="space-y-4 fade-in">
-                        <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
-                        <template x-if="fundamentalsData">
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                    <div class="th-card p-5">
-                                        <h4 class="text-sm font-semibold th-heading mb-3">Revenue & Net Income</h4>
-                                        <div id="fund-revenue-chart" style="min-height:300px;"></div>
-                                    </div>
-                                    <div class="th-card p-5">
-                                        <h4 class="text-sm font-semibold th-heading mb-3">Margins</h4>
-                                        <div id="fund-margins-chart" style="min-height:300px;"></div>
-                                    </div>
-                                </div>
-                                <div class="th-card p-5">
-                                    <h4 class="text-sm font-semibold th-heading mb-3">Cash Flow</h4>
-                                    <div id="fund-cashflow-chart" style="min-height:300px;"></div>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
+        <div class="flex items-center gap-3 mb-6">
+            <input type="text" x-model="analysisSymbol" @keydown.enter="loadAnalysis(analysisSymbol)" placeholder="Ticker e.g. AAPL" class="px-4 py-2.5 rounded-[10px] text-sm input-f w-44 uppercase" style="text-transform:uppercase">
+            <button @click="loadAnalysis(analysisSymbol)" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Analyze</button>
+            <div x-show="analysisLoading" class="spinner"></div>
+        </div>
 
-                    <!-- Financials Tab -->
-                    <div x-show="analysisTab === 'Financials'" class="fade-in">
-                        <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
-                        <template x-if="fundamentalsData">
-                            <div class="th-card overflow-hidden">
-                                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b" style="border-color:var(--border)">
-                                    <div class="pill-group">
-                                        <button @click="financialsTab = 'income'" :class="financialsTab === 'income' ? 'active' : ''" class="pill-btn">Income</button>
-                                        <button @click="financialsTab = 'balance'" :class="financialsTab === 'balance' ? 'active' : ''" class="pill-btn">Balance Sheet</button>
-                                        <button @click="financialsTab = 'cashflow'" :class="financialsTab === 'cashflow' ? 'active' : ''" class="pill-btn">Cash Flow</button>
-                                    </div>
-                                    <div class="pill-group">
-                                        <button @click="financialsPeriod = 'annual'" :class="financialsPeriod === 'annual' ? 'active' : ''" class="pill-btn">Annual</button>
-                                        <button @click="financialsPeriod = 'quarterly'" :class="financialsPeriod === 'quarterly' ? 'active' : ''" class="pill-btn">Quarterly</button>
-                                    </div>
-                                </div>
-                                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-                                    <div x-show="getFinancialDates().length === 0" class="text-sm th-faint text-center py-12">No financial data available.</div>
-                                    <table x-show="getFinancialDates().length > 0" class="fin-table">
-                                        <thead>
-                                            <tr>
-                                                <th style="min-width:240px">Line Item</th>
-                                                <template x-for="date in getFinancialDates()" :key="date">
-                                                    <th style="min-width:130px" x-text="formatFinancialDate(date)"></th>
-                                                </template>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <template x-for="row in getFinancialLineItems()" :key="row.id">
-                                                <tr :class="row.type === 'header' ? 'fin-section-row' : ''">
-                                                    <td :class="{'fin-section-cell': row.type === 'header', '!font-semibold !th-heading': row.bold}" x-text="row.label"></td>
-                                                    <template x-for="date in getFinancialDates()" :key="date + row.id">
-                                                        <td x-text="row.type === 'item' ? formatStatementValue(getFinancialValue(row.key, date), row.key) : ''"
-                                                            :class="{'fin-val-negative': row.type === 'item' && getFinancialValue(row.key, date) < 0, '!font-semibold': row.bold}"></td>
-                                                    </template>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
+        <div x-show="analysisData" x-cloak>
+            <!-- Header -->
+            <div class="card p-5 mb-4">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="logo-wrap lg" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(analysisData?.symbol)" @error="ok=false"><span x-show="!ok" x-text="analysisData?.symbol?.charAt(0)" class="text-xl"></span></div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="text-lg font-bold fg-0" x-text="analysisData?.name"></h3>
+                                <span class="text-[11px] fg-3 bg-inset px-2 py-0.5 rounded-md font-medium" x-text="analysisData?.symbol"></span>
+                                <button @click="addToWatchlist(analysisData?.symbol)" class="text-[11px] text-brand-400 border border-brand-500/25 px-2 py-0.5 rounded-md hover:bg-brand-500/10 transition font-medium">+ Watch</button>
                             </div>
-                        </template>
-                    </div>
-
-                    <!-- News Tab -->
-                    <div x-show="analysisTab === 'News'" class="fade-in">
-                        <div x-show="stockNewsLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
-                        <div x-show="!stockNewsLoading && stockNews">
-                            <div class="th-card p-4 mb-4">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm th-heading font-medium">Average Sentiment</span>
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-32 h-2 rounded-full overflow-hidden th-inset">
-                                            <div class="h-full rounded-full transition-all"
-                                                :class="stockNews?.averageSentiment >= 0.05 ? 'bg-emerald-500' : stockNews?.averageSentiment <= -0.05 ? 'bg-red-500' : 'bg-gray-400'"
-                                                :style="'width:' + ((stockNews?.averageSentiment + 1) / 2 * 100) + '%'"></div>
-                                        </div>
-                                        <span class="text-sm font-bold"
-                                            :class="stockNews?.averageSentiment >= 0.05 ? 'text-emerald-500' : stockNews?.averageSentiment <= -0.05 ? 'text-red-500' : 'th-muted'"
-                                            x-text="(stockNews?.averageSentiment >= 0 ? '+' : '') + stockNews?.averageSentiment?.toFixed(3)"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="space-y-3">
-                                <template x-for="(article, idx) in stockNews?.news || []" :key="idx">
-                                    <a :href="article.link" target="_blank" rel="noopener" class="th-card card-hover p-4 flex gap-4 items-start block">
-                                        <img x-show="article.thumbnail" :src="article.thumbnail" class="w-20 h-14 rounded-lg object-cover flex-shrink-0" onerror="this.style.display='none'">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-start justify-between gap-2">
-                                                <h4 class="text-sm font-semibold th-heading line-clamp-2" x-text="article.title"></h4>
-                                                <span class="sentiment-badge flex-shrink-0"
-                                                    :class="'sentiment-' + article.sentiment?.label"
-                                                    x-text="article.sentiment?.label"></span>
-                                            </div>
-                                            <div class="flex items-center gap-3 mt-2 text-[11px] th-muted">
-                                                <span x-text="article.publisher"></span>
-                                                <span x-text="formatNewsDate(article.publishedAt)"></span>
-                                                <span class="font-medium" x-text="'Score: ' + article.sentiment?.score"></span>
-                                            </div>
-                                        </div>
-                                    </a>
-                                </template>
-                            </div>
+                            <div class="text-[12px] fg-2 mt-0.5"><span x-text="analysisData?.sector"></span> <span class="fg-3 mx-1">|</span> <span x-text="analysisData?.industry"></span></div>
                         </div>
                     </div>
-
-                    <!-- Profile Tab -->
-                    <div x-show="analysisTab === 'Profile'" class="space-y-4 fade-in">
-                        <div class="th-card p-5">
-                            <h4 class="text-sm font-semibold th-heading mb-3">About <span x-text="analysisData?.name"></span></h4>
-                            <p class="text-[13px] th-muted leading-relaxed" x-text="analysisData?.description"></p>
-                        </div>
-                        <div class="th-card p-5">
-                            <h4 class="text-sm font-semibold th-heading mb-3">Analyst Consensus</h4>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div class="th-inset rounded-xl p-3"><div class="text-[11px] th-faint font-medium">Recommendation</div><div class="text-sm font-bold th-heading capitalize mt-1" x-text="analysisData?.recommendationKey || 'N/A'"></div></div>
-                                <div class="th-inset rounded-xl p-3"><div class="text-[11px] th-faint font-medium">Target Price</div><div class="text-sm font-bold th-heading mt-1" x-text="formatPrice(analysisData?.targetMeanPrice)"></div></div>
-                                <div class="th-inset rounded-xl p-3"><div class="text-[11px] th-faint font-medium">Target Range</div><div class="text-sm font-bold th-heading mt-1"><span x-text="formatPrice(analysisData?.targetLowPrice)"></span> - <span x-text="formatPrice(analysisData?.targetHighPrice)"></span></div></div>
-                                <div class="th-inset rounded-xl p-3"><div class="text-[11px] th-faint font-medium">Analysts</div><div class="text-sm font-bold th-heading mt-1" x-text="analysisData?.numberOfAnalysts || 'N/A'"></div></div>
-                            </div>
-                        </div>
+                    <div class="md:text-right">
+                        <div class="text-2xl font-bold fg-0 tabular-nums" x-text="fmtP(analysisData?.price)"></div>
+                        <span :class="analysisData?.changePercent>=0?'text-emerald-500 bg-emerald-500/10':'text-red-500 bg-red-500/10'" class="text-[13px] px-2 py-0.5 rounded-md font-semibold tabular-nums inline-block mt-0.5">
+                            <span x-text="analysisData?.changePercent>=0?'+':''"></span><span x-text="analysisData?.change?.toFixed(2)"></span> (<span x-text="analysisData?.changePercent?.toFixed(2)"></span>%)
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <!-- COMPARE -->
-            <div x-show="currentPage === 'compare'" x-cloak class="fade-in">
-                <div class="mb-6">
-                    <h2 class="text-2xl md:text-3xl font-bold th-heading tracking-tight">Compare Stocks</h2>
-                    <p class="text-sm th-muted mt-1">Side-by-side comparison of up to 5 stocks</p>
+            <!-- AI Score -->
+            <div x-show="stockScore" class="card p-5 mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    <span class="text-[13px] font-semibold fg-0">AI Health Score</span>
+                    <span class="text-[11px] px-2 py-0.5 rounded-md font-bold" :class="{'bg-emerald-500/10 text-emerald-400':stockScore?.rating==='Strong Buy'||stockScore?.rating==='Buy','bg-amber-500/10 text-amber-400':stockScore?.rating==='Hold','bg-red-500/10 text-red-400':stockScore?.rating==='Sell'||stockScore?.rating==='Strong Sell'}" x-text="stockScore?.rating"></span>
                 </div>
-                <div class="th-card p-5 mb-6">
-                    <div class="flex flex-wrap items-end gap-3">
-                        <div class="flex-1 min-w-[200px]">
-                            <label class="text-[11px] th-muted font-medium block mb-1.5">Ticker Symbols (comma separated)</label>
-                            <input type="text" x-model="compareInput" @keydown.enter="loadComparison()" placeholder="e.g. AAPL, MSFT, GOOGL, AMZN" class="w-full px-4 py-2.5 rounded-xl text-sm th-input">
-                        </div>
-                        <div>
-                            <label class="text-[11px] th-muted font-medium block mb-1.5">Period</label>
-                            <select x-model="comparePeriod" class="px-3 py-2.5 rounded-xl text-sm th-select">
-                                <option value="1mo">1 Month</option><option value="3mo">3 Months</option><option value="6mo">6 Months</option>
-                                <option value="1y">1 Year</option><option value="2y">2 Years</option><option value="5y">5 Years</option>
-                            </select>
-                        </div>
-                        <button @click="loadComparison()" class="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm hover:shadow-lg hover:shadow-brand-500/20 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            Compare
-                        </button>
-                        <div x-show="compareLoading" class="spinner"></div>
+                <div class="flex items-center gap-6 overflow-x-auto pb-1">
+                    <!-- Overall -->
+                    <div class="text-center flex-shrink-0">
+                        <div class="ring"><svg width="72" height="72" viewBox="0 0 72 72"><circle cx="36" cy="36" r="30" fill="none" stroke="currentColor" stroke-width="4" class="fg-3 opacity-15"/><circle cx="36" cy="36" r="30" fill="none" stroke-width="4" :stroke="scoreColor(stockScore?.overallScore)" :stroke-dasharray="188.5" :stroke-dashoffset="188.5-(188.5*(stockScore?.overallScore||0)/10)" stroke-linecap="round"/></svg><span class="rv text-xl fg-0" x-text="stockScore?.overallScore?.toFixed(1)"></span></div>
+                        <div class="text-[10px] fg-3 font-semibold uppercase mt-1">Overall</div>
                     </div>
+                    <template x-for="(v,k) in stockScore?.scores||{}" :key="k">
+                        <div class="text-center flex-shrink-0">
+                            <div class="ring"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="23" fill="none" stroke="currentColor" stroke-width="3" class="fg-3 opacity-15"/><circle cx="28" cy="28" r="23" fill="none" stroke-width="3" :stroke="scoreColor(v)" :stroke-dasharray="144.5" :stroke-dashoffset="144.5-(144.5*v/10)" stroke-linecap="round"/></svg><span class="rv text-sm fg-0" x-text="v?.toFixed(1)"></span></div>
+                            <div class="text-[10px] fg-3 font-medium capitalize mt-1" x-text="k.replace(/([A-Z])/g,' $1')"></div>
+                        </div>
+                    </template>
                 </div>
-                <div x-show="compareData && Object.keys(compareData).length > 0" x-cloak>
-                    <div class="th-card p-5 mb-6">
-                        <h4 class="text-sm font-semibold th-heading mb-3">Relative Performance (Normalized to 100)</h4>
-                        <div class="flex flex-wrap gap-4 mb-3 text-[11px]">
-                            <template x-for="(sym, i) in Object.keys(compareData)" :key="sym">
-                                <span class="flex items-center gap-1.5">
-                                    <img :src="getLogoUrl(sym)" class="w-4 h-4 rounded" onerror="this.style.display='none'">
-                                    <span class="w-3 h-0.5 inline-block rounded" :style="'background:' + compareColors[i]"></span>
-                                    <span x-text="sym" class="th-body font-medium"></span>
-                                </span>
-                            </template>
-                        </div>
-                        <div id="tv-compare-chart" class="tv-chart-container" style="height:400px;"></div>
+            </div>
+
+            <!-- Key Stats - 2 rows of 6 -->
+            <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4">
+                <template x-for="s in analysisStats.slice(0,12)" :key="s.label">
+                    <div class="card p-3"><div class="text-[10px] fg-3 uppercase tracking-wide font-medium" x-text="s.label"></div><div class="text-[14px] font-semibold fg-0 mt-1 tabular-nums" x-text="s.value"></div></div>
+                </template>
+            </div>
+
+            <!-- Tabs -->
+            <div class="pill-bar mb-4 overflow-x-auto"><template x-for="t in analysisTabs" :key="t"><button @click="switchTab(t)" :class="analysisTab===t?'on':''" class="pill" x-text="t"></button></template></div>
+
+            <!-- Price Chart -->
+            <div x-show="analysisTab==='Chart'" class="card p-5 fade">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-[13px] font-semibold fg-0">Price</span>
+                    <div class="pill-bar"><template x-for="p in ['1mo','3mo','6mo','1y','2y','5y']" :key="p"><button @click="chartPeriod=p;loadPriceChart()" :class="chartPeriod===p?'on':''" class="pill !py-1 !px-2 !text-[11px]" x-text="p"></button></template></div>
+                </div>
+                <div id="tv-price" style="height:400px"></div>
+            </div>
+
+            <!-- Technicals -->
+            <div x-show="analysisTab==='Technicals'" class="space-y-4 fade">
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[13px] font-semibold fg-0">MA & Bollinger</span>
+                        <div class="pill-bar"><template x-for="p in ['3mo','6mo','1y','2y']" :key="p"><button @click="techPeriod=p;loadTech()" :class="techPeriod===p?'on':''" class="pill !py-1 !px-2 !text-[11px]" x-text="p"></button></template></div>
                     </div>
-                    <div class="th-card overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead><tr class="border-b" style="border-color:var(--border)"><th class="text-left p-4 th-muted font-medium text-[13px]">Metric</th><template x-for="sym in Object.keys(compareData)" :key="sym"><th class="text-right p-4 th-heading font-semibold text-[13px]" x-text="sym"></th></template></tr></thead>
-                                <tbody>
-                                    <template x-for="metric in compareMetrics" :key="metric.key">
-                                        <tr class="border-b th-hover" style="border-color:var(--border-subtle)">
-                                            <td class="p-4 th-body text-[13px]" x-text="metric.label"></td>
-                                            <template x-for="sym in Object.keys(compareData)" :key="sym + metric.key">
-                                                <td class="p-4 text-right font-medium text-[13px]" :class="metric.colorize ? getMetricColor(compareData[sym]?.[metric.key]) : 'th-heading'" x-text="formatMetric(compareData[sym]?.[metric.key], metric.format)"></td>
-                                            </template>
-                                        </tr>
-                                    </template>
-                                </tbody>
+                    <div id="tv-ma" style="height:340px"></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">RSI (14)</div><div id="tv-rsi" style="height:200px"></div></div>
+                    <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">MACD</div><div id="tv-macd" style="height:200px"></div></div>
+                </div>
+            </div>
+
+            <!-- Fundamentals -->
+            <div x-show="analysisTab==='Fundamentals'" class="space-y-4 fade">
+                <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
+                <template x-if="fundamentalsData">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Revenue & Net Income</div><div id="f-rev" style="min-height:280px"></div></div>
+                            <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Margins</div><div id="f-margin" style="min-height:280px"></div></div>
+                        </div>
+                        <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Cash Flow</div><div id="f-cf" style="min-height:280px"></div></div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Financials -->
+            <div x-show="analysisTab==='Financials'" class="fade">
+                <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
+                <template x-if="fundamentalsData">
+                    <div class="card overflow-hidden">
+                        <div class="flex flex-wrap items-center justify-between gap-3 p-4" style="border-bottom:1px solid var(--border)">
+                            <div class="pill-bar">
+                                <button @click="finTab='income'" :class="finTab==='income'?'on':''" class="pill">Income</button>
+                                <button @click="finTab='balance'" :class="finTab==='balance'?'on':''" class="pill">Balance</button>
+                                <button @click="finTab='cashflow'" :class="finTab==='cashflow'?'on':''" class="pill">Cash Flow</button>
+                            </div>
+                            <div class="pill-bar">
+                                <button @click="finPeriod='annual'" :class="finPeriod==='annual'?'on':''" class="pill">Annual</button>
+                                <button @click="finPeriod='quarterly'" :class="finPeriod==='quarterly'?'on':''" class="pill">Quarterly</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto max-h-[550px] overflow-y-auto">
+                            <div x-show="!finDates().length" class="text-sm fg-3 text-center py-12">No data available</div>
+                            <table x-show="finDates().length" class="ft">
+                                <thead><tr><th style="min-width:220px">Line Item</th><template x-for="d in finDates()" :key="d"><th style="min-width:120px" x-text="fmtFinDate(d)"></th></template></tr></thead>
+                                <tbody><template x-for="r in finRows()" :key="r.id"><tr :class="r.type==='header'?'sec':''"><td :class="{'sec-label':r.type==='header','!font-semibold':r.bold}" x-text="r.label"></td><template x-for="d in finDates()" :key="d+r.id"><td x-text="r.type==='item'?fmtFin(finVal(r.key,d),r.key):''" :class="{'neg':r.type==='item'&&finVal(r.key,d)<0,'!font-semibold':r.bold}"></td></template></tr></template></tbody>
                             </table>
                         </div>
                     </div>
-                </div>
+                </template>
             </div>
 
-            <!-- PORTFOLIO -->
-            <div x-show="currentPage === 'portfolio'" x-cloak class="fade-in">
-                <div class="flex items-center justify-between mb-6">
-                    <div><h2 class="text-2xl md:text-3xl font-bold th-heading tracking-tight">Portfolio</h2><p class="text-sm th-muted mt-1">Track your holdings and performance</p></div>
-                    <button @click="showAddHolding = true" class="px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm hover:shadow-lg hover:shadow-brand-500/20 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add Holding
-                    </button>
-                </div>
-                <div x-show="portfolio.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    <div class="th-card p-4"><div class="text-[11px] th-faint uppercase tracking-wider font-medium">Total Value</div><div class="text-xl font-bold th-heading mt-1" x-text="'$' + portfolioTotalValue().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
-                    <div class="th-card p-4"><div class="text-[11px] th-faint uppercase tracking-wider font-medium">Total Cost</div><div class="text-xl font-bold th-heading mt-1" x-text="'$' + portfolioTotalCost().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
-                    <div class="th-card p-4"><div class="text-[11px] th-faint uppercase tracking-wider font-medium">Total P&L</div><div :class="portfolioTotalPL() >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-xl font-bold mt-1"><span x-text="portfolioTotalPL() >= 0 ? '+' : '-'"></span>$<span x-text="Math.abs(portfolioTotalPL()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
-                    <div class="th-card p-4"><div class="text-[11px] th-faint uppercase tracking-wider font-medium">Total Return</div><div :class="portfolioTotalReturn() >= 0 ? 'text-emerald-500' : 'text-red-500'" class="text-xl font-bold mt-1"><span x-text="portfolioTotalReturn() >= 0 ? '+' : ''"></span><span x-text="portfolioTotalReturn().toFixed(2)"></span>%</div></div>
-                </div>
-                <div x-show="portfolio.length > 0" class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
-                    <div class="th-card p-5"><h4 class="text-sm font-semibold th-heading mb-3">Allocation</h4><div id="portfolio-allocation-chart" style="min-height:280px;"></div></div>
-                    <div class="th-card p-5 lg:col-span-2"><h4 class="text-sm font-semibold th-heading mb-3">Holdings Performance</h4><div id="portfolio-performance-chart" style="min-height:280px;"></div></div>
-                </div>
-                <div class="th-card overflow-hidden">
-                    <div x-show="portfolioLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
-                    <div x-show="!portfolioLoading && portfolio.length === 0" class="text-center py-16">
-                        <svg class="w-10 h-10 th-faint mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                        <p class="th-muted text-sm">No holdings yet. Click "Add Holding" to get started.</p>
+            <!-- News -->
+            <div x-show="analysisTab==='News'" class="fade">
+                <div x-show="stockNewsLoading" class="space-y-3"><template x-for="i in 4"><div class="skel h-20"></div></template></div>
+                <div x-show="!stockNewsLoading&&stockNews">
+                    <div class="card p-4 mb-4 flex items-center justify-between">
+                        <span class="text-[13px] fg-0 font-medium">Avg Sentiment</span>
+                        <div class="flex items-center gap-2">
+                            <div class="w-28 h-1.5 rounded-full bg-inset overflow-hidden"><div class="h-full rounded-full" :class="stockNews?.averageSentiment>=.05?'bg-emerald-500':stockNews?.averageSentiment<=-.05?'bg-red-500':'bg-gray-500'" :style="'width:'+((stockNews?.averageSentiment+1)/2*100)+'%'"></div></div>
+                            <span class="text-[13px] font-bold tabular-nums" :class="stockNews?.averageSentiment>=.05?'text-emerald-500':stockNews?.averageSentiment<=-.05?'text-red-500':'fg-2'" x-text="(stockNews?.averageSentiment>=0?'+':'')+stockNews?.averageSentiment?.toFixed(3)"></span>
+                        </div>
                     </div>
-                    <div x-show="!portfolioLoading && portfolio.length > 0" class="overflow-x-auto">
-                        <table class="w-full text-[13px]">
-                            <thead><tr class="border-b" style="border-color:var(--border)"><th class="text-left p-4 th-muted font-medium">Stock</th><th class="text-right p-4 th-muted font-medium">Shares</th><th class="text-right p-4 th-muted font-medium">Buy Price</th><th class="text-right p-4 th-muted font-medium">Current</th><th class="text-right p-4 th-muted font-medium">Mkt Value</th><th class="text-right p-4 th-muted font-medium">P&L</th><th class="text-right p-4 th-muted font-medium">Return</th><th class="text-right p-4 th-muted font-medium">Weight</th><th class="text-center p-4 th-muted font-medium"></th></tr></thead>
-                            <tbody>
-                                <template x-for="h in portfolio" :key="h.id">
-                                    <tr class="border-b th-hover" style="border-color:var(--border-subtle)">
-                                        <td class="p-4">
-                                            <div class="flex items-center gap-2.5">
-                                                <img :src="getLogoUrl(h.symbol)" class="logo-img-sm" onerror="this.style.display='none'">
-                                                <div>
-                                                    <button @click="selectStock(h.symbol)" class="font-semibold text-brand-500 hover:text-brand-400 block" x-text="h.symbol"></button>
-                                                    <span class="text-[11px] th-faint" x-text="h.name || h.symbol"></span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="p-4 text-right th-heading font-medium" x-text="h.shares"></td>
-                                        <td class="p-4 text-right th-heading" x-text="'$' + parseFloat(h.buy_price).toFixed(2)"></td>
-                                        <td class="p-4 text-right th-heading" x-text="formatPrice(h.currentPrice)"></td>
-                                        <td class="p-4 text-right th-heading font-medium" x-text="'$' + (h.shares * (h.currentPrice || 0)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></td>
-                                        <td class="p-4 text-right font-medium" :class="holdingPL(h) >= 0 ? 'text-emerald-500' : 'text-red-500'"><span x-text="holdingPL(h) >= 0 ? '+' : '-'"></span>$<span x-text="Math.abs(holdingPL(h)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></td>
-                                        <td class="p-4 text-right font-medium" :class="holdingReturn(h) >= 0 ? 'text-emerald-500' : 'text-red-500'"><span x-text="holdingReturn(h) >= 0 ? '+' : ''"></span><span x-text="holdingReturn(h).toFixed(2)"></span>%</td>
-                                        <td class="p-4 text-right th-body" x-text="holdingWeight(h).toFixed(1) + '%'"></td>
-                                        <td class="p-4 text-center"><button @click="deleteHolding(h.id)" class="th-faint hover:text-red-500 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
+                    <div class="space-y-2">
+                        <template x-for="(a,i) in stockNews?.news||[]" :key="i">
+                            <a :href="a.link" target="_blank" rel="noopener" class="card card-h p-4 flex gap-3 items-start block">
+                                <div class="flex-1 min-w-0"><h4 class="text-[13px] font-semibold fg-0 line-clamp-2" x-text="a.title"></h4><div class="flex items-center gap-3 mt-1.5 text-[11px] fg-3"><span x-text="a.publisher"></span><span x-text="timeAgo(a.publishedAt)"></span></div></div>
+                                <span class="sent flex-shrink-0" :class="a.sentiment?.label==='positive'?'sent-pos':a.sentiment?.label==='negative'?'sent-neg':'sent-neu'" x-text="a.sentiment?.label"></span>
+                            </a>
+                        </template>
                     </div>
                 </div>
             </div>
 
+            <!-- Profile -->
+            <div x-show="analysisTab==='Profile'" class="space-y-4 fade">
+                <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-2">About</div><p class="text-[13px] fg-2 leading-relaxed" x-text="analysisData?.description"></p></div>
+                <div class="card p-5">
+                    <div class="text-[13px] font-semibold fg-0 mb-3">Analyst Targets</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Rating</div><div class="text-sm font-bold fg-0 capitalize mt-1" x-text="analysisData?.recommendationKey||'N/A'"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Target</div><div class="text-sm font-bold fg-0 mt-1" x-text="fmtP(analysisData?.targetMeanPrice)"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Range</div><div class="text-sm font-bold fg-0 mt-1"><span x-text="fmtP(analysisData?.targetLowPrice)"></span> – <span x-text="fmtP(analysisData?.targetHighPrice)"></span></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Analysts</div><div class="text-sm font-bold fg-0 mt-1" x-text="analysisData?.numberOfAnalysts||'N/A'"></div></div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </main>
+    </div>
+
+    <!-- ───────── COMPARE ───────── -->
+    <div x-show="currentPage==='compare'" x-cloak class="fade">
+        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Compare</h2>
+        <p class="text-[13px] fg-2 mb-5">Side-by-side up to 5 stocks</p>
+        <div class="card p-5 mb-5">
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="flex-1 min-w-[180px]"><label class="text-[11px] fg-3 font-medium block mb-1">Tickers</label><input type="text" x-model="compareInput" @keydown.enter="loadCompare()" placeholder="AAPL, MSFT, GOOGL" class="w-full px-4 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Period</label><select x-model="comparePeriod" class="px-3 py-2.5 rounded-[10px] text-sm input-f"><option value="1mo">1M</option><option value="3mo">3M</option><option value="6mo">6M</option><option value="1y" selected>1Y</option><option value="2y">2Y</option><option value="5y">5Y</option></select></div>
+                <button @click="loadCompare()" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Compare</button>
+                <div x-show="compareLoading" class="spinner"></div>
+            </div>
+        </div>
+        <div x-show="compareData&&Object.keys(compareData).length" x-cloak>
+            <div class="card p-5 mb-5">
+                <div class="text-[13px] font-semibold fg-0 mb-3">Relative Performance</div>
+                <div id="tv-cmp" style="height:380px"></div>
+            </div>
+            <div class="card overflow-hidden">
+                <div class="overflow-x-auto"><table class="w-full text-[13px]">
+                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th><template x-for="s in Object.keys(compareData)" :key="s"><th class="text-right p-3.5 fg-0 font-semibold" x-text="s"></th></template></tr></thead>
+                    <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData)" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="m.colorize?metricColor(compareData[s]?.[m.key]):'fg-0'" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
+                </table></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────── PORTFOLIO ───────── -->
+    <div x-show="currentPage==='portfolio'" x-cloak class="fade">
+        <div class="flex items-center justify-between mb-5">
+            <div><h2 class="text-xl md:text-2xl font-bold fg-0">Portfolio</h2><p class="text-[13px] fg-2 mt-0.5">Track holdings & performance</p></div>
+            <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
+        </div>
+        <div x-show="portfolio.length" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Value</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="'$'+ptv().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Cost</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="'$'+ptc().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">P&L</div><div :class="ptp()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptp()>=0?'+':'-'"></span>$<span x-text="Math.abs(ptp()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Return</div><div :class="ptr()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptr()>=0?'+':''"></span><span x-text="ptr().toFixed(2)"></span>%</div></div>
+        </div>
+        <div x-show="portfolio.length" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Allocation</div><div id="p-alloc" style="min-height:260px"></div></div>
+            <div class="card p-5 lg:col-span-2"><div class="text-[13px] font-semibold fg-0 mb-3">P&L by Holding</div><div id="p-perf" style="min-height:260px"></div></div>
+        </div>
+        <div class="card overflow-hidden">
+            <div x-show="portfolioLoading" class="p-6 space-y-3"><template x-for="i in 3"><div class="skel h-12"></div></template></div>
+            <div x-show="!portfolioLoading&&!portfolio.length" class="text-center py-16"><p class="fg-3 text-sm">No holdings yet</p></div>
+            <div x-show="!portfolioLoading&&portfolio.length" class="overflow-x-auto">
+                <table class="w-full text-[13px]">
+                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Stock</th><th class="text-right p-3.5 fg-2 font-medium">Shares</th><th class="text-right p-3.5 fg-2 font-medium">Avg Cost</th><th class="text-right p-3.5 fg-2 font-medium">Price</th><th class="text-right p-3.5 fg-2 font-medium">Value</th><th class="text-right p-3.5 fg-2 font-medium">P&L</th><th class="text-right p-3.5 fg-2 font-medium">Return</th><th class="text-center p-3.5 fg-2 font-medium w-10"></th></tr></thead>
+                    <tbody>
+                        <template x-for="h in portfolio" :key="h.id">
+                            <tr class="hover:bg-[var(--bg-2)] transition" style="border-bottom:1px solid var(--border-s)">
+                                <td class="p-3.5"><div class="flex items-center gap-2.5"><div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(h.symbol)" @error="ok=false"><span x-show="!ok" x-text="h.symbol.charAt(0)"></span></div><div><button @click="selectStock(h.symbol)" class="font-semibold text-brand-400 hover:text-brand-300 text-[13px]" x-text="h.symbol"></button><div class="text-[11px] fg-3" x-text="h.name||''"></div></div></div></td>
+                                <td class="p-3.5 text-right fg-0 font-medium tabular-nums" x-text="h.shares"></td>
+                                <td class="p-3.5 text-right fg-0 tabular-nums" x-text="'$'+parseFloat(h.buy_price).toFixed(2)"></td>
+                                <td class="p-3.5 text-right fg-0 tabular-nums" x-text="fmtP(h.currentPrice)"></td>
+                                <td class="p-3.5 text-right fg-0 font-medium tabular-nums" x-text="'$'+(h.shares*(h.currentPrice||0)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></td>
+                                <td class="p-3.5 text-right font-medium tabular-nums" :class="hpl(h)>=0?'text-emerald-500':'text-red-500'"><span x-text="hpl(h)>=0?'+':'-'"></span>$<span x-text="Math.abs(hpl(h)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></td>
+                                <td class="p-3.5 text-right font-medium tabular-nums" :class="hret(h)>=0?'text-emerald-500':'text-red-500'"><span x-text="hret(h)>=0?'+':''"></span><span x-text="hret(h).toFixed(2)"></span>%</td>
+                                <td class="p-3.5 text-center"><button @click="deleteHolding(h.id)" class="fg-3 hover:text-red-400 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    </div>
+</main>
 </div>
 
-<!-- MOBILE BOTTOM NAV -->
-<nav class="mobile-bottom-nav fixed bottom-0 left-0 right-0 z-40 th-glass border-t th-border px-2 py-2">
+<!-- Mobile nav -->
+<nav class="bnav fixed bottom-0 left-0 right-0 z-40 glass px-2 py-1.5" style="border-top:1px solid var(--border)">
     <div class="flex items-center justify-around">
         <template x-for="item in navItems" :key="item.id">
-            <button @click="navigate(item.id)"
-                :class="currentPage === item.id ? 'text-brand-500' : 'th-muted'"
-                class="flex flex-col items-center gap-0.5 p-2 rounded-xl transition">
+            <button @click="navigate(item.id)" :class="currentPage===item.id?'text-brand-400':'fg-3'" class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition">
                 <span x-html="item.icon" class="w-5 h-5"></span>
                 <span class="text-[9px] font-medium" x-text="item.label"></span>
             </button>
@@ -882,77 +558,59 @@
     </div>
 </nav>
 
-<!-- ADD HOLDING MODAL -->
+<!-- ─── MODALS ─── -->
+<!-- Add Holding -->
 <div x-show="showAddHolding" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 modal-overlay" @click="showAddHolding = false"></div>
-    <div class="relative th-card shadow-2xl w-full max-w-md p-6 fade-in" @click.stop>
-        <h3 class="text-lg font-bold th-heading mb-5">Add Holding</h3>
-        <div class="space-y-4">
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Ticker Symbol *</label><input type="text" x-model="newHolding.symbol" placeholder="e.g. AAPL" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showAddHolding=false"></div>
+    <div class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
+        <h3 class="text-base font-bold fg-0 mb-4">Add Holding</h3>
+        <div class="space-y-3">
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol *</label><input type="text" x-model="newHolding.symbol" placeholder="AAPL" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase" style="text-transform:uppercase"></div>
             <div class="grid grid-cols-2 gap-3">
-                <div><label class="text-[11px] th-muted font-medium block mb-1.5">Shares *</label><input type="number" x-model="newHolding.shares" placeholder="10" step="any" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
-                <div><label class="text-[11px] th-muted font-medium block mb-1.5">Buy Price *</label><input type="number" x-model="newHolding.buy_price" placeholder="150.00" step="any" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Shares *</label><input type="number" x-model="newHolding.shares" placeholder="10" step="any" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Price *</label><input type="number" x-model="newHolding.buy_price" placeholder="150.00" step="any" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
             </div>
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Buy Date</label><input type="date" x-model="newHolding.buy_date" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Notes</label><input type="text" x-model="newHolding.notes" placeholder="Optional notes" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Date</label><input type="date" x-model="newHolding.buy_date" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
         </div>
-        <div class="flex justify-end gap-3 mt-6">
-            <button @click="showAddHolding = false" class="px-4 py-2.5 text-sm th-muted hover:th-heading transition rounded-xl">Cancel</button>
-            <button @click="addHolding()" class="px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm">Add to Portfolio</button>
+        <div class="flex justify-end gap-2 mt-5">
+            <button @click="showAddHolding=false" class="px-4 py-2 text-sm fg-2 hover:fg-0 transition rounded-lg">Cancel</button>
+            <button @click="addHolding()" class="px-5 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Add</button>
         </div>
     </div>
 </div>
-
-<!-- LOGIN MODAL -->
+<!-- Login -->
 <div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 modal-overlay" @click="showLoginModal = false"></div>
-    <div class="relative th-card shadow-2xl w-full max-w-sm p-6 fade-in" @click.stop>
-        <div class="text-center mb-6">
-            <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/20">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-            </div>
-            <h3 class="text-lg font-bold th-heading">Welcome Back</h3>
-            <p class="text-[13px] th-muted mt-1">Sign in to save your portfolio</p>
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showLoginModal=false"></div>
+    <div class="relative card shadow-2xl w-full max-w-sm p-6 fade" @click.stop>
+        <div class="text-center mb-5">
+            <div class="w-11 h-11 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/25"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
+            <h3 class="text-base font-bold fg-0">Welcome Back</h3>
         </div>
-        <div x-show="authError" class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-500 font-medium" x-text="authError"></div>
-        <div class="space-y-4">
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="your@email.com" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" placeholder="Your password" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
+        <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+        <div class="space-y-3">
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
         </div>
-        <button @click="login()" :disabled="authLoading" class="w-full mt-5 px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm disabled:opacity-50">
-            <span x-show="!authLoading">Sign In</span>
-            <span x-show="authLoading">Signing in...</span>
-        </button>
-        <div class="text-center mt-4">
-            <button @click="showLoginModal = false; showRegisterModal = true" class="text-[12px] text-brand-500 hover:text-brand-400 font-medium">Don't have an account? Sign Up</button>
-        </div>
+        <button @click="login()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':'Sign In'"></button>
+        <div class="text-center mt-3"><button @click="showLoginModal=false;showRegisterModal=true" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
     </div>
 </div>
-
-<!-- REGISTER MODAL -->
+<!-- Register -->
 <div x-show="showRegisterModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 modal-overlay" @click="showRegisterModal = false"></div>
-    <div class="relative th-card shadow-2xl w-full max-w-sm p-6 fade-in" @click.stop>
-        <div class="text-center mb-6">
-            <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/20">
-                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            </div>
-            <h3 class="text-lg font-bold th-heading">Create Account</h3>
-            <p class="text-[13px] th-muted mt-1">Start tracking your investments</p>
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showRegisterModal=false"></div>
+    <div class="relative card shadow-2xl w-full max-w-sm p-6 fade" @click.stop>
+        <div class="text-center mb-5">
+            <div class="w-11 h-11 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/25"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></div>
+            <h3 class="text-base font-bold fg-0">Create Account</h3>
         </div>
-        <div x-show="authError" class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-500 font-medium" x-text="authError"></div>
-        <div class="space-y-4">
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Email</label><input type="email" x-model="registerForm.email" placeholder="your@email.com" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
-            <div><label class="text-[11px] th-muted font-medium block mb-1.5">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 characters" class="w-full px-3 py-2.5 rounded-xl text-sm th-input"></div>
+        <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+        <div class="space-y-3">
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
         </div>
-        <button @click="register()" :disabled="authLoading" class="w-full mt-5 px-5 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 transition-all shadow-sm disabled:opacity-50">
-            <span x-show="!authLoading">Create Account</span>
-            <span x-show="authLoading">Creating...</span>
-        </button>
-        <div class="text-center mt-4">
-            <button @click="showRegisterModal = false; showLoginModal = true" class="text-[12px] text-brand-500 hover:text-brand-400 font-medium">Already have an account? Sign In</button>
-        </div>
+        <button @click="register()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating...':'Create Account'"></button>
+        <div class="text-center mt-3"><button @click="showRegisterModal=false;showLoginModal=true" class="text-[12px] text-brand-400 font-medium">Sign in instead</button></div>
     </div>
 </div>
 
