@@ -5,6 +5,7 @@ import re
 import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 import yfinance as yf
@@ -119,15 +120,19 @@ def optional_auth(f):
     return decorated
 
 
-# -- Helper: cache yfinance Ticker objects ------------------------------------
+# -- Helper: cache yfinance Ticker objects (5-min TTL) -----------------------
 
 _ticker_cache = {}
+_ticker_cache_time = {}
+_TICKER_TTL = 300
 
 
 def get_ticker(symbol: str) -> yf.Ticker:
     s = symbol.upper().strip()
-    if s not in _ticker_cache:
+    now = datetime.utcnow().timestamp()
+    if s not in _ticker_cache or (now - _ticker_cache_time.get(s, 0)) > _TICKER_TTL:
         _ticker_cache[s] = yf.Ticker(s)
+        _ticker_cache_time[s] = now
     return _ticker_cache[s]
 
 
@@ -399,8 +404,8 @@ def api_market():
         "CL=F": "Crude Oil",
         "BTC-USD": "Bitcoin",
     }
-    results = []
-    for sym, name in indices.items():
+
+    def fetch_index(sym, name):
         try:
             t = yf.Ticker(sym)
             info = t.info
@@ -408,21 +413,14 @@ def api_market():
             prev = safe_get(info, "previousClose") or safe_get(info, "regularMarketPreviousClose", 0)
             change = round(price - prev, 2) if price and prev else 0
             change_pct = round((price - prev) / prev * 100, 2) if prev else 0
-            results.append({
-                "symbol": sym,
-                "name": name,
-                "price": price,
-                "change": change,
-                "changePercent": change_pct,
-            })
+            return {"symbol": sym, "name": name, "price": price, "change": change, "changePercent": change_pct}
         except Exception:
-            results.append({
-                "symbol": sym,
-                "name": name,
-                "price": 0,
-                "change": 0,
-                "changePercent": 0,
-            })
+            return {"symbol": sym, "name": name, "price": 0, "change": 0, "changePercent": 0}
+
+    with ThreadPoolExecutor(max_workers=9) as executor:
+        futures = [executor.submit(fetch_index, sym, name) for sym, name in indices.items()]
+        results = [f.result() for f in futures]
+
     return jsonify(results)
 
 
@@ -487,7 +485,8 @@ def api_portfolio_list():
     else:
         rows = db.execute("SELECT * FROM holdings WHERE user_id IS NULL ORDER BY created_at DESC").fetchall()
     holdings = [dict(r) for r in rows]
-    for h in holdings:
+
+    def enrich_holding(h):
         try:
             t = get_ticker(h["symbol"])
             info = t.info
@@ -495,6 +494,12 @@ def api_portfolio_list():
             h["name"] = safe_get(info, "longName") or safe_get(info, "shortName", h["symbol"])
         except Exception:
             h["currentPrice"] = 0
+        return h
+
+    if holdings:
+        with ThreadPoolExecutor(max_workers=min(len(holdings), 8)) as executor:
+            holdings = list(executor.map(enrich_holding, holdings))
+
     return jsonify(holdings)
 
 
@@ -531,6 +536,14 @@ def api_portfolio_update(holding_id):
     if not data:
         return jsonify({"error": "No data provided"}), 400
     db = get_db()
+    user = g.current_user
+    user_id = user["user_id"] if user else None
+    if user_id:
+        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id)).fetchone()
+    else:
+        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Holding not found"}), 404
     fields = []
     values = []
     for key in ("symbol", "name", "shares", "buy_price", "buy_date", "notes"):
@@ -549,7 +562,12 @@ def api_portfolio_update(holding_id):
 @optional_auth
 def api_portfolio_delete(holding_id):
     db = get_db()
-    db.execute("DELETE FROM holdings WHERE id = ?", (holding_id,))
+    user = g.current_user
+    user_id = user["user_id"] if user else None
+    if user_id:
+        db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id))
+    else:
+        db.execute("DELETE FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,))
     db.commit()
     return jsonify({"message": "Holding deleted"})
 
@@ -565,9 +583,9 @@ def api_watchlist_list():
         rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
     else:
         rows = db.execute("SELECT * FROM watchlist WHERE user_id IS NULL ORDER BY added_at DESC").fetchall()
-    items = []
-    for r in rows:
-        item = dict(r)
+    items = [dict(r) for r in rows]
+
+    def enrich_watchlist_item(item):
         try:
             t = get_ticker(item["symbol"])
             info = t.info
@@ -579,7 +597,12 @@ def api_watchlist_list():
             item["price"] = 0
             item["change"] = 0
             item["changePercent"] = 0
-        items.append(item)
+        return item
+
+    if items:
+        with ThreadPoolExecutor(max_workers=min(len(items), 8)) as executor:
+            items = list(executor.map(enrich_watchlist_item, items))
+
     return jsonify(items)
 
 
@@ -674,48 +697,98 @@ def api_technicals(symbol):
         return jsonify({"error": str(e)}), 500
 
 
-# -- API: News with Sentiment Analysis ----------------------------------------
+# -- News Fetcher (direct Yahoo Finance API) ----------------------------------
 
-@app.route("/api/news/<symbol>")
-def api_news(symbol):
+def _fetch_yahoo_news(symbol, count=20):
+    """Fetch news directly from Yahoo Finance API, bypassing yfinance .news property."""
+    import urllib.request
+    results = []
+
+    # Method 1: Yahoo search API (news endpoint)
     try:
-        t = get_ticker(symbol)
-        news_items = t.news or []
-        results = []
-        for item in news_items[:20]:
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}&quotesCount=0&newsCount={count}&enableFuzzyQuery=false"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        for item in data.get("news", []):
             title = item.get("title", "")
-            publisher = item.get("publisher", "")
-            link = item.get("link", "")
-            pub_date = item.get("providerPublishTime", 0)
+            if not title:
+                continue
             thumbnail = ""
             if item.get("thumbnail"):
                 resolutions = item["thumbnail"].get("resolutions", [])
                 if resolutions:
                     thumbnail = resolutions[-1].get("url", "")
-
-            sentiment_scores = sentiment_analyzer.polarity_scores(title)
-            compound = sentiment_scores["compound"]
-            if compound >= 0.05:
-                sentiment_label = "positive"
-            elif compound <= -0.05:
-                sentiment_label = "negative"
-            else:
-                sentiment_label = "neutral"
-
             results.append({
                 "title": title,
-                "publisher": publisher,
-                "link": link,
-                "publishedAt": pub_date,
+                "publisher": item.get("publisher", ""),
+                "link": item.get("link", "") or item.get("url", ""),
+                "publishedAt": item.get("providerPublishTime", 0),
                 "thumbnail": thumbnail,
-                "sentiment": {
-                    "score": round(compound, 3),
-                    "label": sentiment_label,
-                    "positive": round(sentiment_scores["pos"], 3),
-                    "negative": round(sentiment_scores["neg"], 3),
-                    "neutral": round(sentiment_scores["neu"], 3),
-                },
             })
+    except Exception:
+        pass
+
+    # Method 2: yfinance .news fallback (handles both old and new formats)
+    if not results:
+        try:
+            t = get_ticker(symbol)
+            news_items = t.news or []
+            for item in news_items[:count]:
+                title = item.get("title", "")
+                if not title:
+                    continue
+                link = item.get("link", "") or item.get("url", "") or item.get("canonical_url", "")
+                pub_date = item.get("providerPublishTime", 0) or item.get("provider_publish_time", 0)
+                thumbnail = ""
+                if item.get("thumbnail"):
+                    resolutions = item["thumbnail"].get("resolutions", [])
+                    if resolutions:
+                        thumbnail = resolutions[-1].get("url", "")
+                elif item.get("img"):
+                    thumbnail = item["img"]
+                results.append({
+                    "title": title,
+                    "publisher": item.get("publisher", "") or item.get("source", ""),
+                    "link": link,
+                    "publishedAt": pub_date,
+                    "thumbnail": thumbnail,
+                })
+        except Exception:
+            pass
+
+    return results
+
+
+def _analyze_sentiment(title):
+    """Run VADER sentiment on a headline and return label + scores."""
+    scores = sentiment_analyzer.polarity_scores(title)
+    compound = scores["compound"]
+    if compound >= 0.05:
+        label = "positive"
+    elif compound <= -0.05:
+        label = "negative"
+    else:
+        label = "neutral"
+    return {
+        "score": round(compound, 3),
+        "label": label,
+        "positive": round(scores["pos"], 3),
+        "negative": round(scores["neg"], 3),
+        "neutral": round(scores["neu"], 3),
+    }
+
+
+# -- API: News with Sentiment Analysis ----------------------------------------
+
+@app.route("/api/news/<symbol>")
+def api_news(symbol):
+    try:
+        news_items = _fetch_yahoo_news(symbol.upper(), count=20)
+        results = []
+        for item in news_items:
+            item["sentiment"] = _analyze_sentiment(item["title"])
+            results.append(item)
 
         avg_sentiment = 0
         if results:
@@ -1004,49 +1077,28 @@ def api_score(symbol):
 @app.route("/api/market-news")
 def api_market_news():
     try:
-        major_tickers = ["^GSPC", "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA"]
+        major_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META"]
         all_news = []
         seen_titles = set()
 
-        for sym in major_tickers:
-            try:
-                t = yf.Ticker(sym)
-                news_items = t.news or []
-                for item in news_items[:5]:
-                    title = item.get("title", "")
-                    if title in seen_titles:
-                        continue
-                    seen_titles.add(title)
+        def fetch_sym_news(sym):
+            return sym, _fetch_yahoo_news(sym, count=8)
 
-                    sentiment_scores = sentiment_analyzer.polarity_scores(title)
-                    compound = sentiment_scores["compound"]
-                    if compound >= 0.05:
-                        sentiment_label = "positive"
-                    elif compound <= -0.05:
-                        sentiment_label = "negative"
-                    else:
-                        sentiment_label = "neutral"
-
-                    thumbnail = ""
-                    if item.get("thumbnail"):
-                        resolutions = item["thumbnail"].get("resolutions", [])
-                        if resolutions:
-                            thumbnail = resolutions[-1].get("url", "")
-
-                    all_news.append({
-                        "title": title,
-                        "publisher": item.get("publisher", ""),
-                        "link": item.get("link", ""),
-                        "publishedAt": item.get("providerPublishTime", 0),
-                        "thumbnail": thumbnail,
-                        "relatedSymbol": sym,
-                        "sentiment": {
-                            "score": round(compound, 3),
-                            "label": sentiment_label,
-                        },
-                    })
-            except Exception:
-                continue
+        with ThreadPoolExecutor(max_workers=7) as executor:
+            futures = [executor.submit(fetch_sym_news, sym) for sym in major_tickers]
+            for f in futures:
+                try:
+                    sym, items = f.result()
+                    for item in items:
+                        title = item.get("title", "")
+                        if not title or title in seen_titles:
+                            continue
+                        seen_titles.add(title)
+                        item["relatedSymbol"] = sym
+                        item["sentiment"] = _analyze_sentiment(title)
+                        all_news.append(item)
+                except Exception:
+                    continue
 
         all_news.sort(key=lambda x: x.get("publishedAt", 0), reverse=True)
         return jsonify({"news": all_news[:30]})

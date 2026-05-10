@@ -19,6 +19,7 @@ function app() {
     return {
         currentPage:'dashboard', searchQuery:'', searchResults:[], showSearchDropdown:false,
         darkMode: localStorage.getItem('investorhub-theme') !== 'light',
+        connectionError:false, retrying:false,
 
         authToken: localStorage.getItem('investorhub-token')||'',
         currentUser: JSON.parse(localStorage.getItem('investorhub-user')||'null'),
@@ -64,6 +65,12 @@ function app() {
         init() {
             this.applyTheme();
             this.loadMarketData(); this.loadWatchlist(); this.loadPortfolio();
+            this._waitForLibs();
+        },
+        _chartsReady:false,
+        _waitForLibs(){
+            if(typeof LightweightCharts!=='undefined'&&typeof ApexCharts!=='undefined'){this._chartsReady=true;return}
+            setTimeout(()=>this._waitForLibs(),100);
         },
 
         // ── Auth ──
@@ -104,7 +111,7 @@ function app() {
         reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData)this.renderCmpChart();if(this.portfolio.length)this.renderPortCharts()},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news'&&!this.marketNews.length)this.loadMarketNews();if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
         switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol)})},
 
@@ -119,12 +126,33 @@ function app() {
         timeAgo(ts){if(!ts)return'';const s=(Date.now()/1000-ts);if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'})},
 
         // ── API ──
-        async api(u){const r=await fetch(API_BASE+u,{headers:this.authH()});if(!r.ok)throw new Error(r.status);return r.json()},
+        async api(u){
+            try{
+                const r=await fetch(API_BASE+u,{headers:this.authH()});
+                if(!r.ok)throw new Error(r.status);
+                this.connectionError=false;
+                return r.json();
+            }catch(e){
+                if(e.message==='Failed to fetch'||e.name==='TypeError')this.connectionError=true;
+                throw e;
+            }
+        },
         async post(u,d){const r=await fetch(API_BASE+u,{method:'POST',headers:{'Content-Type':'application/json',...this.authH()},body:JSON.stringify(d)});return r.json()},
         async del(u){await fetch(API_BASE+u,{method:'DELETE',headers:this.authH()})},
+        async retryConnection(){this.retrying=true;try{await this.api('/');this.connectionError=false;this.init()}catch(e){}this.retrying=false},
 
         // ── Search ──
-        async searchStocks(){if(this.searchQuery.length<1){this.searchResults=[];this.showSearchDropdown=false;return}try{const r=await this.api(`/api/search?q=${encodeURIComponent(this.searchQuery)}`);this.searchResults=Array.isArray(r)?r:[];this.showSearchDropdown=this.searchResults.length>0}catch(e){this.searchResults=[];this.showSearchDropdown=false}},
+        _searchId:0,
+        async searchStocks(){
+            if(this.searchQuery.length<1){this.searchResults=[];this.showSearchDropdown=false;return}
+            const id=++this._searchId;
+            try{
+                const r=await this.api(`/api/search?q=${encodeURIComponent(this.searchQuery)}`);
+                if(id!==this._searchId)return;
+                this.searchResults=Array.isArray(r)?r:[];
+                this.showSearchDropdown=this.searchResults.length>0;
+            }catch(e){if(id===this._searchId){this.searchResults=[];this.showSearchDropdown=false}}
+        },
 
         // ── Market ──
         async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
@@ -188,7 +216,7 @@ function app() {
         fmtFinDate(s){return new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'})},
 
         // ── Charts ──
-        mkTv(id,h){this.rmTv(id);const el=document.getElementById(id);if(!el)return null;el.innerHTML='';const c=this.tc();const ch=LightweightCharts.createChart(el,{width:el.clientWidth,height:h||380,layout:{background:{type:'solid',color:c.bg},textColor:c.text,fontFamily:'Inter,system-ui,sans-serif',fontSize:12},grid:{vertLines:{color:c.grid},horzLines:{color:c.grid}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal},rightPriceScale:{borderColor:c.border},timeScale:{borderColor:c.border,timeVisible:false}});const ro=new ResizeObserver(e=>{for(const en of e)ch.applyOptions({width:en.contentRect.width})});ro.observe(el);this.tv[id]={chart:ch,ro};return ch},
+        mkTv(id,h){if(typeof LightweightCharts==='undefined')return null;this.rmTv(id);const el=document.getElementById(id);if(!el)return null;el.innerHTML='';const c=this.tc();const ch=LightweightCharts.createChart(el,{width:el.clientWidth,height:h||380,layout:{background:{type:'solid',color:c.bg},textColor:c.text,fontFamily:'Inter,system-ui,sans-serif',fontSize:12},grid:{vertLines:{color:c.grid},horzLines:{color:c.grid}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal},rightPriceScale:{borderColor:c.border},timeScale:{borderColor:c.border,timeVisible:false}});const ro=new ResizeObserver(e=>{for(const en of e)ch.applyOptions({width:en.contentRect.width})});ro.observe(el);this.tv[id]={chart:ch,ro};return ch},
         rmTv(id){const e=this.tv[id];if(e){e.ro.disconnect();e.chart.remove();delete this.tv[id]}},
 
         async loadPriceChart(){
@@ -228,6 +256,6 @@ function app() {
         renderCmpChart(){if(!this.compareData)return;const ch=this.mkTv('tv-cmp',380);if(!ch)return;Object.keys(this.compareData).forEach((s,i)=>{const p=this.compareData[s]?.prices||[];if(!p.length)return;ch.addLineSeries({color:this.cmpColors[i%5],lineWidth:2,title:s,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)}}).setData(p.map(r=>({time:r.date,value:r.normalized})))});ch.timeScale().fitContent()},
 
         // ── Apex ──
-        renderApex(id,opts){if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
+        renderApex(id,opts){if(typeof ApexCharts==='undefined')return;if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
     };
 }
