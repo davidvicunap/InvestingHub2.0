@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://logo.clearbit.com">
+    <link rel="preconnect" href="https://t2.gstatic.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/tailwind.css">
@@ -80,6 +81,18 @@
         /* Score ring */
         .ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
         .ring svg{transform:rotate(-90deg)}.ring .rv{position:absolute;font-weight:800}
+
+        /* Score bar */
+        .score-bar{height:8px;border-radius:99px;overflow:hidden;background:var(--bg-2);position:relative}
+        .score-bar .fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+        /* Gradient score header */
+        .score-hdr{background:linear-gradient(135deg,rgba(99,102,241,.06) 0%,rgba(139,92,246,.06) 50%,rgba(6,182,212,.04) 100%)}
+        html.dark .score-hdr{background:linear-gradient(135deg,rgba(99,102,241,.1) 0%,rgba(139,92,246,.08) 50%,rgba(6,182,212,.06) 100%)}
+
+        /* Stock header */
+        .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.03) 100%)}
+        html.dark .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.06) 100%)}
 
         /* Scrollbar */
         ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg-2)}::-webkit-scrollbar-thumb{background:var(--fg-3);border-radius:3px}
@@ -363,22 +376,30 @@
 
         <div x-show="analysisData" x-cloak>
             <!-- Header -->
-            <div class="card p-5 mb-4">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div class="flex items-center gap-4">
-                        <div class="logo-wrap lg" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(analysisData?.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(analysisData?.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="analysisData?.symbol?.charAt(0)" class="text-xl"></span></div>
+            <div class="card stock-hdr p-6 mb-4">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                    <div class="flex items-center gap-5">
+                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg" :style="'background:linear-gradient(135deg,'+scoreColor(stockScore?.overallScore||5)+'22,'+scoreColor(stockScore?.overallScore||5)+'08)'" x-data="{lvl:0}">
+                            <img x-show="lvl===0" :src="logoUrl(analysisData?.symbol)" @error="lvl=1" loading="lazy" class="w-full h-full object-contain">
+                            <img x-show="lvl===1" :src="logoFallback(analysisData?.symbol)" @error="lvl=2" loading="lazy" class="w-full h-full object-contain p-1.5">
+                            <span x-show="lvl===2" x-text="analysisData?.symbol?.charAt(0)" class="text-2xl font-bold" :style="'color:'+scoreColor(stockScore?.overallScore||5)"></span>
+                        </div>
                         <div>
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <h3 class="text-lg font-bold fg-0" x-text="analysisData?.name"></h3>
-                                <span class="text-[11px] fg-3 bg-inset px-2 py-0.5 rounded-md font-medium" x-text="analysisData?.symbol"></span>
-                                <button @click="addToWatchlist(analysisData?.symbol)" class="text-[11px] text-brand-400 border border-brand-500/25 px-2 py-0.5 rounded-md hover:bg-brand-500/10 transition font-medium">+ Watch</button>
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <h3 class="text-xl font-bold fg-0" x-text="analysisData?.name"></h3>
+                                <span class="text-[11px] fg-2 bg-inset px-2.5 py-1 rounded-lg font-semibold tracking-wide" x-text="analysisData?.symbol"></span>
+                                <button @click="addToWatchlist(analysisData?.symbol)" class="text-[11px] text-brand-400 border border-brand-500/30 px-2.5 py-1 rounded-lg hover:bg-brand-500/10 transition font-semibold">+ Watch</button>
                             </div>
-                            <div class="text-[12px] fg-2 mt-0.5"><span x-text="analysisData?.sector"></span> <span class="fg-3 mx-1">|</span> <span x-text="analysisData?.industry"></span></div>
+                            <div class="text-[12px] fg-2 mt-1 flex items-center gap-1.5">
+                                <span x-text="analysisData?.sector"></span>
+                                <span class="w-1 h-1 rounded-full bg-[var(--fg-3)]"></span>
+                                <span x-text="analysisData?.industry"></span>
+                            </div>
                         </div>
                     </div>
                     <div class="md:text-right">
-                        <div class="text-2xl font-bold fg-0 tabular-nums" x-text="fmtP(analysisData?.price)"></div>
-                        <span :class="analysisData?.changePercent>=0?'text-emerald-500 bg-emerald-500/10':'text-red-500 bg-red-500/10'" class="text-[13px] px-2 py-0.5 rounded-md font-semibold tabular-nums inline-block mt-0.5">
+                        <div class="text-3xl font-extrabold fg-0 tabular-nums tracking-tight" x-text="fmtP(analysisData?.price)"></div>
+                        <span :class="analysisData?.changePercent>=0?'text-emerald-500 bg-emerald-500/10':'text-red-500 bg-red-500/10'" class="text-[13px] px-2.5 py-1 rounded-lg font-bold tabular-nums inline-block mt-1">
                             <span x-text="analysisData?.changePercent>=0?'+':''"></span><span x-text="analysisData?.change?.toFixed(2)"></span> (<span x-text="analysisData?.changePercent?.toFixed(2)"></span>%)
                         </span>
                     </div>
@@ -386,40 +407,66 @@
             </div>
 
             <!-- AI Score -->
-            <div x-show="stockScore" class="card p-5 mb-4">
-                <div class="flex items-center gap-2 mb-5">
-                    <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                    <span class="text-[13px] font-semibold fg-0">AI Health Score</span>
-                    <span class="text-[11px] px-2 py-0.5 rounded-md font-bold" :class="{'bg-emerald-500/10 text-emerald-400':stockScore?.rating==='Strong Buy'||stockScore?.rating==='Buy','bg-amber-500/10 text-amber-400':stockScore?.rating==='Hold','bg-red-500/10 text-red-400':stockScore?.rating==='Sell'||stockScore?.rating==='Strong Sell'}" x-text="stockScore?.rating"></span>
-                </div>
-                <div class="flex flex-col md:flex-row items-center gap-6 md:gap-8">
-                    <!-- Overall -->
-                    <div class="text-center flex-shrink-0">
-                        <div class="ring"><svg width="88" height="88" viewBox="0 0 88 88"><circle cx="44" cy="44" r="37" fill="none" stroke="currentColor" stroke-width="5" class="fg-3 opacity-15"/><circle cx="44" cy="44" r="37" fill="none" stroke-width="5" :stroke="scoreColor(stockScore?.overallScore)" :stroke-dasharray="232.5" :stroke-dashoffset="232.5-(232.5*(stockScore?.overallScore||0)/10)" stroke-linecap="round"/></svg><span class="rv text-2xl font-extrabold fg-0" x-text="stockScore?.overallScore?.toFixed(1)"></span></div>
-                        <div class="text-[10px] fg-3 font-bold uppercase tracking-wider mt-1.5">Overall</div>
-                        <div class="text-[9px] fg-3 mt-0.5">out of 10</div>
+            <div x-show="stockScore" class="card mb-4 overflow-hidden">
+                <div class="score-hdr px-6 py-4 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg bg-brand-500/15 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <span class="text-[14px] font-bold fg-0">AI Health Score</span>
                     </div>
-                    <!-- Sub-scores grid -->
-                    <div class="grid grid-cols-3 md:grid-cols-5 gap-4 md:gap-5 flex-1">
-                        <template x-for="cat in scoreCategories" :key="cat.key">
-                            <div class="text-center" x-show="stockScore?.scores?.[cat.key] != null">
-                                <div class="ring"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="23" fill="none" stroke="currentColor" stroke-width="3" class="fg-3 opacity-15"/><circle cx="28" cy="28" r="23" fill="none" stroke-width="3" :stroke="scoreColor(stockScore?.scores?.[cat.key])" :stroke-dasharray="144.5" :stroke-dashoffset="144.5-(144.5*(stockScore?.scores?.[cat.key]||0)/10)" stroke-linecap="round"/></svg><span class="rv text-sm fg-0" x-text="stockScore?.scores?.[cat.key]?.toFixed(1)"></span></div>
-                                <div class="text-[10px] fg-0 font-semibold mt-1.5" x-text="cat.label"></div>
-                                <div class="text-[9px] fg-3" x-text="cat.desc"></div>
+                    <span class="text-[11px] px-3 py-1 rounded-lg font-bold tracking-wide" :class="{'bg-emerald-500/15 text-emerald-400':stockScore?.rating==='Strong Buy'||stockScore?.rating==='Buy','bg-amber-500/15 text-amber-400':stockScore?.rating==='Hold','bg-red-500/15 text-red-400':stockScore?.rating==='Sell'||stockScore?.rating==='Strong Sell'}" x-text="stockScore?.rating"></span>
+                </div>
+                <div class="px-6 py-5">
+                    <div class="flex flex-col md:flex-row items-center gap-8 md:gap-10">
+                        <!-- Overall donut -->
+                        <div class="text-center flex-shrink-0">
+                            <div class="ring">
+                                <svg width="100" height="100" viewBox="0 0 100 100">
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-2)" stroke-width="8"/>
+                                    <circle cx="50" cy="50" r="42" fill="none" stroke-width="8"
+                                        :stroke="scoreColor(stockScore?.overallScore)"
+                                        :stroke-dasharray="263.9"
+                                        :stroke-dashoffset="263.9-(263.9*(stockScore?.overallScore||0)/10)"
+                                        stroke-linecap="round"
+                                        style="filter:drop-shadow(0 0 6px var(--glow,transparent))"
+                                        :style="'--glow:'+scoreColor(stockScore?.overallScore)+'44'"/>
+                                </svg>
+                                <span class="rv text-3xl font-extrabold fg-0" x-text="stockScore?.overallScore?.toFixed(1)"></span>
                             </div>
-                        </template>
+                            <div class="text-[10px] fg-3 font-bold uppercase tracking-widest mt-2">Overall</div>
+                        </div>
+                        <!-- Sub-scores as progress bars -->
+                        <div class="flex-1 w-full space-y-4">
+                            <template x-for="cat in scoreCategories" :key="cat.key">
+                                <div x-show="stockScore?.scores?.[cat.key] != null" class="group">
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <div>
+                                            <span class="text-[12px] font-semibold fg-0" x-text="cat.label"></span>
+                                            <span class="text-[10px] fg-3 ml-1.5" x-text="cat.desc"></span>
+                                        </div>
+                                        <span class="text-[13px] font-bold tabular-nums" :style="'color:'+scoreColor(stockScore?.scores?.[cat.key])" x-text="stockScore?.scores?.[cat.key]?.toFixed(1)"></span>
+                                    </div>
+                                    <div class="score-bar">
+                                        <div class="fill" :style="'width:'+(stockScore?.scores?.[cat.key]||0)*10+'%;background:'+scoreColor(stockScore?.scores?.[cat.key])"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </div>
                 <!-- Key metrics breakdown -->
-                <div x-show="stockScore?.details" class="mt-5 pt-4" style="border-top:1px solid var(--border-s)">
-                    <div class="text-[10px] fg-3 font-semibold uppercase tracking-wider mb-2.5">Key Metrics</div>
-                    <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">Profit Margin</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.profitMargin?(stockScore.details.profitMargin*100).toFixed(1)+'%':'—'"></div></div>
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">ROE</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.returnOnEquity?(stockScore.details.returnOnEquity*100).toFixed(1)+'%':'—'"></div></div>
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">Rev Growth</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.revenueGrowth?(stockScore.details.revenueGrowth*100).toFixed(1)+'%':'—'"></div></div>
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">P/E Ratio</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.peRatio?stockScore.details.peRatio.toFixed(1):'—'"></div></div>
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">Debt/Equity</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.debtToEquity?stockScore.details.debtToEquity.toFixed(1):'—'"></div></div>
-                        <div class="bg-inset rounded-lg p-2.5"><div class="text-[9px] fg-3 font-medium uppercase">Current Ratio</div><div class="text-[13px] font-semibold fg-0 mt-0.5" x-text="stockScore?.details?.currentRatio?stockScore.details.currentRatio.toFixed(2):'—'"></div></div>
+                <div x-show="stockScore?.details" class="px-6 pb-5">
+                    <div class="pt-4" style="border-top:1px solid var(--border-s)">
+                        <div class="text-[10px] fg-3 font-bold uppercase tracking-widest mb-3">Key Metrics</div>
+                        <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">Profit Margin</div><div class="text-[14px] font-bold fg-0 mt-1 tabular-nums" x-text="stockScore?.details?.profitMargin?(stockScore.details.profitMargin*100).toFixed(1)+'%':'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">ROE</div><div class="text-[14px] font-bold fg-0 mt-1 tabular-nums" x-text="stockScore?.details?.returnOnEquity?(stockScore.details.returnOnEquity*100).toFixed(1)+'%':'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">Rev Growth</div><div class="text-[14px] font-bold mt-1 tabular-nums" :class="stockScore?.details?.revenueGrowth>0?'text-emerald-500':'text-red-500'" x-text="stockScore?.details?.revenueGrowth?(stockScore.details.revenueGrowth*100).toFixed(1)+'%':'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">P/E Ratio</div><div class="text-[14px] font-bold fg-0 mt-1 tabular-nums" x-text="stockScore?.details?.peRatio?stockScore.details.peRatio.toFixed(1):'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">Debt/Equity</div><div class="text-[14px] font-bold fg-0 mt-1 tabular-nums" x-text="stockScore?.details?.debtToEquity?stockScore.details.debtToEquity.toFixed(1):'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 font-semibold uppercase tracking-wide">Current Ratio</div><div class="text-[14px] font-bold fg-0 mt-1 tabular-nums" x-text="stockScore?.details?.currentRatio?stockScore.details.currentRatio.toFixed(2):'—'"></div></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -427,7 +474,7 @@
             <!-- Key Stats - 2 rows of 6 -->
             <div class="grid grid-cols-3 md:grid-cols-6 gap-2 mb-4">
                 <template x-for="s in analysisStats.slice(0,12)" :key="s.label">
-                    <div class="card p-3"><div class="text-[10px] fg-3 uppercase tracking-wide font-medium" x-text="s.label"></div><div class="text-[14px] font-semibold fg-0 mt-1 tabular-nums" x-text="s.value"></div></div>
+                    <div class="card card-h p-3.5"><div class="text-[10px] fg-3 uppercase tracking-wide font-semibold" x-text="s.label"></div><div class="text-[14px] font-bold fg-0 mt-1.5 tabular-nums" x-text="s.value"></div></div>
                 </template>
             </div>
 
