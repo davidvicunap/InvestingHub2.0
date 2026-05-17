@@ -476,14 +476,11 @@ def api_compare():
 # -- API: Portfolio CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/portfolio", methods=["GET"])
-@optional_auth
+@require_auth
 def api_portfolio_list():
     db = get_db()
     user = g.current_user
-    if user:
-        rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],)).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM holdings WHERE user_id IS NULL ORDER BY created_at DESC").fetchall()
+    rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],)).fetchall()
     holdings = [dict(r) for r in rows]
 
     def enrich_holding(h):
@@ -504,14 +501,14 @@ def api_portfolio_list():
 
 
 @app.route("/api/portfolio", methods=["POST"])
-@optional_auth
+@require_auth
 def api_portfolio_add():
     data = request.get_json()
     if not data or not data.get("symbol") or not data.get("shares") or not data.get("buy_price"):
         return jsonify({"error": "symbol, shares, and buy_price are required"}), 400
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
+    user_id = user["user_id"]
     symbol = data["symbol"].upper().strip()
     name = data.get("name", "")
     if not name:
@@ -530,18 +527,14 @@ def api_portfolio_add():
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["PUT"])
-@optional_auth
+@require_auth
 def api_portfolio_update(holding_id):
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
-    if user_id:
-        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id)).fetchone()
-    else:
-        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,)).fetchone()
+    row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"])).fetchone()
     if not row:
         return jsonify({"error": "Holding not found"}), 404
     fields = []
@@ -559,15 +552,11 @@ def api_portfolio_update(holding_id):
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["DELETE"])
-@optional_auth
+@require_auth
 def api_portfolio_delete(holding_id):
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
-    if user_id:
-        db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id))
-    else:
-        db.execute("DELETE FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,))
+    db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"]))
     db.commit()
     return jsonify({"message": "Holding deleted"})
 
@@ -575,14 +564,11 @@ def api_portfolio_delete(holding_id):
 # -- API: Watchlist CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/watchlist", methods=["GET"])
-@optional_auth
+@require_auth
 def api_watchlist_list():
     db = get_db()
     user = g.current_user
-    if user:
-        rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM watchlist WHERE user_id IS NULL ORDER BY added_at DESC").fetchall()
+    rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
     items = [dict(r) for r in rows]
 
     def enrich_watchlist_item(item):
@@ -607,7 +593,7 @@ def api_watchlist_list():
 
 
 @app.route("/api/watchlist", methods=["POST"])
-@optional_auth
+@require_auth
 def api_watchlist_add():
     data = request.get_json()
     if not data or not data.get("symbol"):
@@ -622,7 +608,7 @@ def api_watchlist_add():
             name = symbol
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
+    user_id = user["user_id"]
     try:
         db.execute(
             "INSERT OR REPLACE INTO watchlist (user_id, symbol, name) VALUES (?, ?, ?)",
@@ -635,14 +621,11 @@ def api_watchlist_add():
 
 
 @app.route("/api/watchlist/<symbol>", methods=["DELETE"])
-@optional_auth
+@require_auth
 def api_watchlist_delete(symbol):
     db = get_db()
     user = g.current_user
-    if user:
-        db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), user["user_id"]))
-    else:
-        db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id IS NULL", (symbol.upper(),))
+    db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), user["user_id"]))
     db.commit()
     return jsonify({"message": f"{symbol} removed from watchlist"})
 
@@ -955,8 +938,8 @@ def api_score(symbol):
         # Financial Health (weight: 20)
         health_score = 0
         health_factors = 0
-        de = safe_get(info, "debtToEquity", 0)
-        if de is not None and de >= 0:
+        de = safe_get(info, "debtToEquity")
+        if de is not None and de > 0:
             health_factors += 1
             if de < 30:
                 health_score += 10
@@ -1072,6 +1055,94 @@ def api_score(symbol):
         return jsonify({"error": str(e)}), 500
 
 
+# -- API: SEC Filings ---------------------------------------------------------
+
+_sec_tickers_cache = None
+_sec_tickers_cache_time = 0
+_SEC_TICKERS_TTL = 86400
+
+
+def _get_sec_cik(symbol):
+    global _sec_tickers_cache, _sec_tickers_cache_time
+    import urllib.request
+    now = datetime.utcnow().timestamp()
+    if not _sec_tickers_cache or (now - _sec_tickers_cache_time) > _SEC_TICKERS_TTL:
+        url = "https://www.sec.gov/files/company_tickers.json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "InvestorHub admin@investorhub.app",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        lookup = {}
+        for entry in data.values():
+            ticker = entry.get("ticker", "").upper()
+            if ticker:
+                lookup[ticker] = {
+                    "cik": str(entry["cik_str"]).zfill(10),
+                    "name": entry.get("title", ""),
+                }
+        _sec_tickers_cache = lookup
+        _sec_tickers_cache_time = now
+    return _sec_tickers_cache.get(symbol.upper())
+
+
+@app.route("/api/sec-filings/<symbol>")
+def api_sec_filings(symbol):
+    import urllib.request
+    symbol = symbol.upper().strip()
+    try:
+        company = _get_sec_cik(symbol)
+        if not company:
+            return jsonify({"error": f"No SEC filings found for {symbol}"}), 404
+
+        cik = company["cik"]
+        url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "InvestorHub admin@investorhub.app",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            submissions = json.loads(resp.read().decode())
+
+        recent = submissions.get("filings", {}).get("recent", {})
+        forms = recent.get("form", [])
+        dates = recent.get("filingDate", [])
+        accessions = recent.get("accessionNumber", [])
+        descriptions = recent.get("primaryDocDescription", [])
+        docs = recent.get("primaryDocument", [])
+
+        important_forms = {"10-K", "10-Q", "8-K", "DEF 14A", "20-F", "6-K", "S-1"}
+        cik_num = cik.lstrip("0")
+        filings = []
+        for i in range(min(len(forms), 100)):
+            form = forms[i] if i < len(forms) else ""
+            if form not in important_forms:
+                continue
+            accession = accessions[i].replace("-", "") if i < len(accessions) else ""
+            doc = docs[i] if i < len(docs) else ""
+            filing_url = f"https://www.sec.gov/Archives/edgar/data/{cik_num}/{accession}/{doc}" if doc else ""
+            filings.append({
+                "form": form,
+                "filingDate": dates[i] if i < len(dates) else "",
+                "description": descriptions[i] if i < len(descriptions) else form,
+                "url": filing_url,
+                "accessionNumber": accessions[i] if i < len(accessions) else "",
+            })
+            if len(filings) >= 25:
+                break
+
+        return jsonify({
+            "symbol": symbol,
+            "cik": cik,
+            "companyName": company["name"],
+            "filings": filings,
+            "edgarUrl": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=&dateb=&owner=include&count=40&search_text=&action=getcompany",
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # -- API: Market News (General) -----------------------------------------------
 
 @app.route("/api/market-news")
@@ -1102,6 +1173,311 @@ def api_market_news():
 
         all_news.sort(key=lambda x: x.get("publishedAt", 0), reverse=True)
         return jsonify({"news": all_news[:30]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Chat (Technical Analysis Teacher) --------------------------------
+
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+CHAT_MODEL = os.environ.get("CHAT_MODEL", "minimax/minimax-01")
+
+TA_SYSTEM_PROMPT = """You are a Technical Analysis (TA) expert and teacher, trained in the style of the New York Institute of Finance curriculum. Your role is to educate users about technical analysis clearly and concisely.
+
+Your knowledge covers:
+
+**Foundations**: Dow Theory (six tenets), market structure (primary/secondary/minor trends), market phases (accumulation, markup, distribution, markdown), Efficient Market Hypothesis critique from a TA perspective.
+
+**Chart Types & Construction**: Line charts, bar charts (OHLC), candlestick charts (Japanese candlesticks — doji, hammer, engulfing, morning/evening star, harami, shooting star, hanging man, three white soldiers, three black crows, spinning tops), point & figure, Renko, Heikin-Ashi.
+
+**Trend Analysis**: Identifying uptrends, downtrends, and sideways markets. Trendlines, channels (ascending/descending/horizontal), trend exhaustion. Higher highs/higher lows vs lower highs/lower lows.
+
+**Support & Resistance**: Static vs dynamic S/R, role reversal principle, psychological price levels (round numbers), volume at price (volume profile), pivot points (classic, Fibonacci, Woodie, Camarilla).
+
+**Chart Patterns**: Reversal patterns (head & shoulders, inverse H&S, double top/bottom, triple top/bottom, rounding top/bottom, V-reversal). Continuation patterns (flags, pennants, wedges, rectangles, triangles — ascending/descending/symmetrical). Complex patterns (cup & handle, diamond, broadening formation).
+
+**Technical Indicators — Trend**: Simple Moving Average (SMA), Exponential Moving Average (EMA), Weighted Moving Average (WMA), moving average crossovers (golden cross/death cross), DEMA, TEMA, Ichimoku Cloud (tenkan-sen, kijun-sen, senkou span A/B, chikou span), Parabolic SAR, ADX/DMI.
+
+**Technical Indicators — Momentum/Oscillators**: Relative Strength Index (RSI) — overbought/oversold, divergences, failure swings. MACD — signal line, histogram, divergences. Stochastic Oscillator (%K, %D, fast/slow). Williams %R, CCI (Commodity Channel Index), Rate of Change (ROC), Momentum indicator.
+
+**Technical Indicators — Volatility**: Bollinger Bands (squeeze, expansion, %B, bandwidth), Average True Range (ATR), Keltner Channels, Donchian Channels, standard deviation, historical vs implied volatility.
+
+**Technical Indicators — Volume**: On-Balance Volume (OBV), Volume Price Trend (VPT), Accumulation/Distribution Line, Chaikin Money Flow (CMF), Money Flow Index (MFI), VWAP (Volume Weighted Average Price), volume spikes and climax volume.
+
+**Fibonacci Analysis**: Retracements (23.6%, 38.2%, 50%, 61.8%, 78.6%), extensions (127.2%, 161.8%, 261.8%), Fibonacci fans, arcs, time zones, confluence with S/R.
+
+**Elliott Wave Theory**: Five-wave impulse structure (waves 1-5), three-wave corrective structure (A-B-C), wave personality, alternation principle, wave counting rules (wave 2 never retraces 100% of wave 1, wave 3 is never the shortest, wave 4 does not overlap wave 1), fractal nature of waves.
+
+**Candlestick Patterns (Advanced)**: Two-candle patterns (bullish/bearish engulfing, piercing line/dark cloud cover, tweezer tops/bottoms). Three-candle patterns (morning/evening star, three inside up/down, three outside up/down, abandoned baby). Context matters — patterns at S/R vs mid-range.
+
+**Risk Management & Position Sizing**: Stop-loss placement (below S/R, ATR-based, percentage-based), risk-reward ratios (minimum 1:2), position sizing formulas, Kelly criterion, maximum drawdown management, correlation risk.
+
+**Market Breadth & Intermarket Analysis**: Advance-decline line, new highs/new lows, McClellan Oscillator, sector rotation, relative strength analysis, correlation between bonds/equities/commodities/currencies.
+
+**Trading Psychology**: Fear and greed cycles, confirmation bias, anchoring, loss aversion, herd behavior, emotional discipline, trading plan development.
+
+**Response guidelines**:
+- Be concise but thorough. Use 2-4 paragraphs maximum for most answers.
+- Include practical examples when explaining concepts (e.g., "If RSI drops below 30 on AAPL while price makes a higher low, that's a bullish divergence").
+- When relevant, mention which timeframes an indicator works best on.
+- Always mention limitations and false signals for any indicator or pattern.
+- If asked about trading advice, remind the user this is educational only, not financial advice.
+- Use clear formatting with bold for key terms."""
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("messages"):
+        return jsonify({"error": "messages required"}), 400
+
+    user_messages = data["messages"][-20:]
+    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + user_messages
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1024,
+                "temperature": 0.7,
+            },
+            timeout=30,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Chat request failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Portfolio Review --------------------------------------------------
+
+PORTFOLIO_SYSTEM_PROMPT = """You are a Portfolio Analyst specializing in diversification, risk management, and strategic allocation. Analyze the user's portfolio and provide actionable insights.
+
+Your analysis should cover:
+- **Allocation**: Sector concentration, over/under-weight positions, single-stock risk
+- **Diversification**: Geographic, sector, market-cap diversity; correlation concerns
+- **Risk Assessment**: Beta-weighted exposure, volatility profile, drawdown potential
+- **Performance**: Winners/losers, cost basis efficiency, unrealized gains/losses
+- **Rebalancing**: Specific suggestions to improve risk-adjusted returns
+- **Income**: Dividend coverage, yield-on-cost if applicable
+
+Response guidelines:
+- Be specific and reference actual holdings by ticker
+- Provide 3-5 concrete, prioritized recommendations
+- Mention both risks and strengths
+- Keep total response under 400 words
+- Use bold for key terms and bullet points for clarity
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/portfolio", methods=["POST"])
+@optional_auth
+def api_chat_portfolio():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("portfolio_context"):
+        return jsonify({"error": "portfolio_context required"}), 400
+
+    portfolio_context = data["portfolio_context"]
+    user_message = data.get("message", "Please analyze my portfolio and provide recommendations.")
+
+    messages = [
+        {"role": "system", "content": PORTFOLIO_SYSTEM_PROMPT},
+        {"role": "user", "content": f"Here is my current portfolio:\n\n{portfolio_context}\n\nUser question: {user_message}"}
+    ]
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1500,
+                "temperature": 0.6,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Portfolio analysis failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: Earnings Calendar & Dividends ----------------------------------------
+
+_calendar_cache = {}
+_calendar_cache_time = {}
+_CALENDAR_TTL = 900
+
+
+@app.route("/api/earnings-calendar")
+@optional_auth
+def api_earnings_calendar():
+    """Returns upcoming earnings dates and dividend events for user's tracked stocks."""
+    db = get_db()
+    user = g.current_user
+    symbols = set()
+
+    if user:
+        rows = db.execute("SELECT symbol FROM holdings WHERE user_id = ?", (user["user_id"],)).fetchall()
+        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id = ?", (user["user_id"],)).fetchall()
+    else:
+        rows = db.execute("SELECT symbol FROM holdings WHERE user_id IS NULL").fetchall()
+        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id IS NULL").fetchall()
+
+    for r in rows:
+        symbols.add(r["symbol"])
+    for r in wrows:
+        symbols.add(r["symbol"])
+
+    if not symbols:
+        return jsonify({"events": []})
+
+    events = []
+
+    def fetch_calendar(sym):
+        now = datetime.utcnow().timestamp()
+        cache_key = f"cal_{sym}"
+        if cache_key in _calendar_cache and (now - _calendar_cache_time.get(cache_key, 0)) < _CALENDAR_TTL:
+            return _calendar_cache[cache_key]
+
+        result = []
+        try:
+            t = get_ticker(sym)
+
+            # Earnings dates
+            try:
+                ed = t.earnings_dates
+                if ed is not None and not ed.empty:
+                    for idx in ed.index[:4]:
+                        date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)[:10]
+                        row_data = ed.loc[idx]
+                        result.append({
+                            "symbol": sym,
+                            "type": "earnings",
+                            "date": date_str,
+                            "epsEstimate": float(row_data.get("EPS Estimate", 0)) if pd.notna(row_data.get("EPS Estimate", None)) else None,
+                            "epsActual": float(row_data.get("Reported EPS", 0)) if pd.notna(row_data.get("Reported EPS", None)) else None,
+                            "surprise": float(row_data.get("Surprise(%)", 0)) if pd.notna(row_data.get("Surprise(%)", None)) else None,
+                        })
+            except Exception:
+                pass
+
+            # Dividend info
+            try:
+                info = t.info
+                ex_div = safe_get(info, "exDividendDate")
+                if ex_div:
+                    if isinstance(ex_div, (int, float)):
+                        ex_date = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
+                    else:
+                        ex_date = str(ex_div)[:10]
+                    result.append({
+                        "symbol": sym,
+                        "type": "dividend",
+                        "date": ex_date,
+                        "amount": safe_get(info, "dividendRate", 0),
+                        "yield": safe_get(info, "dividendYield", 0),
+                    })
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        _calendar_cache[cache_key] = result
+        _calendar_cache_time[cache_key] = now
+        return result
+
+    with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as executor:
+        results = list(executor.map(fetch_calendar, symbols))
+
+    for r in results:
+        events.extend(r)
+
+    # Filter to upcoming 90 days
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    future_limit = (datetime.utcnow() + timedelta(days=90)).strftime('%Y-%m-%d')
+    events = [e for e in events if e.get("date") and e["date"] >= today and e["date"] <= future_limit]
+    events.sort(key=lambda x: x.get("date", ""))
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for e in events:
+        key = f"{e['symbol']}_{e['type']}_{e['date']}"
+        if key not in seen:
+            seen.add(key)
+            unique.append(e)
+
+    return jsonify({"events": unique})
+
+
+@app.route("/api/dividends/<symbol>")
+def api_dividends(symbol):
+    """Returns dividend details and payment history for a symbol."""
+    try:
+        t = get_ticker(symbol.upper())
+        info = t.info
+        result = {
+            "symbol": symbol.upper(),
+            "dividendRate": safe_get(info, "dividendRate", 0),
+            "dividendYield": safe_get(info, "dividendYield", 0),
+            "exDividendDate": None,
+            "payoutRatio": safe_get(info, "payoutRatio", 0),
+            "fiveYearAvgDividendYield": safe_get(info, "fiveYearAvgDividendYield", 0),
+            "history": [],
+        }
+
+        ex_div = safe_get(info, "exDividendDate")
+        if ex_div and isinstance(ex_div, (int, float)):
+            result["exDividendDate"] = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
+        elif ex_div:
+            result["exDividendDate"] = str(ex_div)[:10]
+
+        try:
+            divs = t.dividends
+            if divs is not None and not divs.empty:
+                three_years_ago = (datetime.utcnow() - timedelta(days=1095)).strftime('%Y-%m-%d')
+                recent = divs[divs.index >= three_years_ago] if len(divs) > 20 else divs.tail(20)
+                result["history"] = [
+                    {"date": idx.strftime('%Y-%m-%d'), "amount": round(float(val), 4)}
+                    for idx, val in recent.items()
+                ]
+        except Exception:
+            pass
+
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

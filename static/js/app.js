@@ -23,6 +23,7 @@ function app() {
 
         authToken: localStorage.getItem('investorhub-token')||'',
         currentUser: JSON.parse(localStorage.getItem('investorhub-user')||'null'),
+        authPage:'login',
         showLoginModal:false, showRegisterModal:false, authError:'', authLoading:false,
         loginForm:{email:'',password:''}, registerForm:{name:'',email:'',password:''},
 
@@ -82,7 +83,9 @@ function app() {
 
         init() {
             this.applyTheme();
-            this.loadMarketData(); this.loadWatchlist(); this.loadPortfolio();
+            if(this.authToken){
+                this.loadMarketData(); this.loadWatchlist(); this.loadPortfolio();
+            }
             this._waitForLibs();
         },
         _chartsReady:false,
@@ -101,7 +104,8 @@ function app() {
                 if(!r.ok){this.authError=d.error||'Failed';this.authLoading=false;return}
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
-                this.showLoginModal=false;this.loginForm={email:'',password:''};this.loadPortfolio();this.loadWatchlist();
+                this.showLoginModal=false;this.loginForm={email:'',password:''};
+                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
             } catch(e){this.authError='Connection error'}
             this.authLoading=false;
         },
@@ -113,13 +117,14 @@ function app() {
                 if(!r.ok){this.authError=d.error||'Failed';this.authLoading=false;return}
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
-                this.showRegisterModal=false;this.registerForm={name:'',email:'',password:''};this.loadPortfolio();this.loadWatchlist();
+                this.showRegisterModal=false;this.registerForm={name:'',email:'',password:''};
+                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
             } catch(e){this.authError='Connection error'}
             this.authLoading=false;
         },
         logout() {
             this.authToken='';this.currentUser=null;localStorage.removeItem('investorhub-token');localStorage.removeItem('investorhub-user');
-            this.portfolio=[];this.watchlist=[];this.loadWatchlist();this.loadPortfolio();
+            this.portfolio=[];this.watchlist=[];this.marketData=[];this.currentPage='dashboard';
         },
 
         // ── Theme ──
@@ -147,6 +152,7 @@ function app() {
         async api(u){
             try{
                 const r=await fetch(API_BASE+u,{headers:this.authH()});
+                if(r.status===401){this.logout();throw new Error('Session expired')}
                 if(!r.ok)throw new Error(r.status);
                 this.connectionError=false;
                 return r.json();

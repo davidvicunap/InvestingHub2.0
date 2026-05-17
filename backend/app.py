@@ -476,14 +476,11 @@ def api_compare():
 # -- API: Portfolio CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/portfolio", methods=["GET"])
-@optional_auth
+@require_auth
 def api_portfolio_list():
     db = get_db()
     user = g.current_user
-    if user:
-        rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],)).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM holdings WHERE user_id IS NULL ORDER BY created_at DESC").fetchall()
+    rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],)).fetchall()
     holdings = [dict(r) for r in rows]
 
     def enrich_holding(h):
@@ -504,14 +501,14 @@ def api_portfolio_list():
 
 
 @app.route("/api/portfolio", methods=["POST"])
-@optional_auth
+@require_auth
 def api_portfolio_add():
     data = request.get_json()
     if not data or not data.get("symbol") or not data.get("shares") or not data.get("buy_price"):
         return jsonify({"error": "symbol, shares, and buy_price are required"}), 400
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
+    user_id = user["user_id"]
     symbol = data["symbol"].upper().strip()
     name = data.get("name", "")
     if not name:
@@ -530,18 +527,14 @@ def api_portfolio_add():
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["PUT"])
-@optional_auth
+@require_auth
 def api_portfolio_update(holding_id):
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
-    if user_id:
-        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id)).fetchone()
-    else:
-        row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,)).fetchone()
+    row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"])).fetchone()
     if not row:
         return jsonify({"error": "Holding not found"}), 404
     fields = []
@@ -559,15 +552,11 @@ def api_portfolio_update(holding_id):
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["DELETE"])
-@optional_auth
+@require_auth
 def api_portfolio_delete(holding_id):
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
-    if user_id:
-        db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user_id))
-    else:
-        db.execute("DELETE FROM holdings WHERE id = ? AND user_id IS NULL", (holding_id,))
+    db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"]))
     db.commit()
     return jsonify({"message": "Holding deleted"})
 
@@ -575,14 +564,11 @@ def api_portfolio_delete(holding_id):
 # -- API: Watchlist CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/watchlist", methods=["GET"])
-@optional_auth
+@require_auth
 def api_watchlist_list():
     db = get_db()
     user = g.current_user
-    if user:
-        rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM watchlist WHERE user_id IS NULL ORDER BY added_at DESC").fetchall()
+    rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
     items = [dict(r) for r in rows]
 
     def enrich_watchlist_item(item):
@@ -607,7 +593,7 @@ def api_watchlist_list():
 
 
 @app.route("/api/watchlist", methods=["POST"])
-@optional_auth
+@require_auth
 def api_watchlist_add():
     data = request.get_json()
     if not data or not data.get("symbol"):
@@ -622,7 +608,7 @@ def api_watchlist_add():
             name = symbol
     db = get_db()
     user = g.current_user
-    user_id = user["user_id"] if user else None
+    user_id = user["user_id"]
     try:
         db.execute(
             "INSERT OR REPLACE INTO watchlist (user_id, symbol, name) VALUES (?, ?, ?)",
@@ -635,14 +621,11 @@ def api_watchlist_add():
 
 
 @app.route("/api/watchlist/<symbol>", methods=["DELETE"])
-@optional_auth
+@require_auth
 def api_watchlist_delete(symbol):
     db = get_db()
     user = g.current_user
-    if user:
-        db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), user["user_id"]))
-    else:
-        db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id IS NULL", (symbol.upper(),))
+    db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), user["user_id"]))
     db.commit()
     return jsonify({"message": f"{symbol} removed from watchlist"})
 

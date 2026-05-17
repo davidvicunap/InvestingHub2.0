@@ -117,7 +117,45 @@
 </head>
 
 <body class="bg-page fg-1 min-h-screen" x-data="app()" x-init="init()">
-<div class="flex h-screen overflow-hidden">
+
+<!-- ─── AUTH GATE (full-page login/register) ─── -->
+<div x-show="!authToken" x-cloak class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+            <div class="w-14 h-14 bg-gradient-to-br from-brand-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/25">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </div>
+            <h1 class="text-2xl font-bold fg-0">InvestorHub</h1>
+            <p class="text-sm fg-3 mt-1">Analytics Platform</p>
+        </div>
+        <!-- Login Form -->
+        <div x-show="authPage==='login'" class="card p-6 fade">
+            <h2 class="text-base font-bold fg-0 text-center mb-5">Welcome Back</h2>
+            <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+            <div class="space-y-3">
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            </div>
+            <button @click="login()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':'Sign In'"></button>
+            <div class="text-center mt-4"><span class="text-[12px] fg-3">Don't have an account?</span> <button @click="authError='';authPage='register'" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
+        </div>
+        <!-- Register Form -->
+        <div x-show="authPage==='register'" class="card p-6 fade">
+            <h2 class="text-base font-bold fg-0 text-center mb-5">Create Account</h2>
+            <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+            <div class="space-y-3">
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            </div>
+            <button @click="register()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating...':'Create Account'"></button>
+            <div class="text-center mt-4"><span class="text-[12px] fg-3">Already have an account?</span> <button @click="authError='';authPage='login'" class="text-[12px] text-brand-400 font-medium">Sign in</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── MAIN APP (only visible when authenticated) ─── -->
+<div x-show="authToken" x-cloak class="flex h-screen overflow-hidden">
 
 <!-- ─── SIDEBAR ─── -->
 <aside class="side w-[252px] bg-card border-r flex flex-col flex-shrink-0" style="border-color:var(--border)">
@@ -841,7 +879,7 @@
 </div>
 
 <!-- Mobile nav -->
-<nav class="bnav fixed bottom-0 left-0 right-0 z-40 glass px-2 py-1.5" style="border-top:1px solid var(--border)">
+<nav x-show="authToken" class="bnav fixed bottom-0 left-0 right-0 z-40 glass px-2 py-1.5" style="border-top:1px solid var(--border)">
     <div class="flex items-center justify-around">
         <template x-for="item in navItems" :key="item.id">
             <button @click="navigate(item.id)" :class="currentPage===item.id?'text-brand-400':'fg-3'" class="flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition">
@@ -891,41 +929,6 @@
             <button @click="showEditHolding=false" class="px-4 py-2 text-sm fg-2 hover:fg-0 transition rounded-lg">Cancel</button>
             <button @click="saveEditHolding()" class="px-5 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Save</button>
         </div>
-    </div>
-</div>
-<!-- Login -->
-<div x-show="showLoginModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showLoginModal=false"></div>
-    <div class="relative card shadow-2xl w-full max-w-sm p-6 fade" @click.stop>
-        <div class="text-center mb-5">
-            <div class="w-11 h-11 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/25"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
-            <h3 class="text-base font-bold fg-0">Welcome Back</h3>
-        </div>
-        <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-        <div class="space-y-3">
-            <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-            <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-        </div>
-        <button @click="login()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':'Sign In'"></button>
-        <div class="text-center mt-3"><button @click="showLoginModal=false;showRegisterModal=true" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
-    </div>
-</div>
-<!-- Register -->
-<div x-show="showRegisterModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showRegisterModal=false"></div>
-    <div class="relative card shadow-2xl w-full max-w-sm p-6 fade" @click.stop>
-        <div class="text-center mb-5">
-            <div class="w-11 h-11 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-500/25"><svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></div>
-            <h3 class="text-base font-bold fg-0">Create Account</h3>
-        </div>
-        <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-        <div class="space-y-3">
-            <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-            <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-            <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-        </div>
-        <button @click="register()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating...':'Create Account'"></button>
-        <div class="text-center mt-3"><button @click="showRegisterModal=false;showLoginModal=true" class="text-[12px] text-brand-400 font-medium">Sign in instead</button></div>
     </div>
 </div>
 
