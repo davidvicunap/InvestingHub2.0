@@ -955,8 +955,8 @@ def api_score(symbol):
         # Financial Health (weight: 20)
         health_score = 0
         health_factors = 0
-        de = safe_get(info, "debtToEquity", 0)
-        if de is not None and de >= 0:
+        de = safe_get(info, "debtToEquity")
+        if de is not None and de > 0:
             health_factors += 1
             if de < 30:
                 health_score += 10
@@ -1067,6 +1067,94 @@ def api_score(symbol):
                 "currentRatio": safe_get(info, "currentRatio", 0),
                 "freeCashflow": safe_get(info, "freeCashflow", 0),
             }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: SEC Filings ---------------------------------------------------------
+
+_sec_tickers_cache = None
+_sec_tickers_cache_time = 0
+_SEC_TICKERS_TTL = 86400
+
+
+def _get_sec_cik(symbol):
+    global _sec_tickers_cache, _sec_tickers_cache_time
+    import urllib.request
+    now = datetime.utcnow().timestamp()
+    if not _sec_tickers_cache or (now - _sec_tickers_cache_time) > _SEC_TICKERS_TTL:
+        url = "https://www.sec.gov/files/company_tickers.json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "InvestorHub admin@investorhub.app",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+        lookup = {}
+        for entry in data.values():
+            ticker = entry.get("ticker", "").upper()
+            if ticker:
+                lookup[ticker] = {
+                    "cik": str(entry["cik_str"]).zfill(10),
+                    "name": entry.get("title", ""),
+                }
+        _sec_tickers_cache = lookup
+        _sec_tickers_cache_time = now
+    return _sec_tickers_cache.get(symbol.upper())
+
+
+@app.route("/api/sec-filings/<symbol>")
+def api_sec_filings(symbol):
+    import urllib.request
+    symbol = symbol.upper().strip()
+    try:
+        company = _get_sec_cik(symbol)
+        if not company:
+            return jsonify({"error": f"No SEC filings found for {symbol}"}), 404
+
+        cik = company["cik"]
+        url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "InvestorHub admin@investorhub.app",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            submissions = json.loads(resp.read().decode())
+
+        recent = submissions.get("filings", {}).get("recent", {})
+        forms = recent.get("form", [])
+        dates = recent.get("filingDate", [])
+        accessions = recent.get("accessionNumber", [])
+        descriptions = recent.get("primaryDocDescription", [])
+        docs = recent.get("primaryDocument", [])
+
+        important_forms = {"10-K", "10-Q", "8-K", "DEF 14A", "20-F", "6-K", "S-1"}
+        cik_num = cik.lstrip("0")
+        filings = []
+        for i in range(min(len(forms), 100)):
+            form = forms[i] if i < len(forms) else ""
+            if form not in important_forms:
+                continue
+            accession = accessions[i].replace("-", "") if i < len(accessions) else ""
+            doc = docs[i] if i < len(docs) else ""
+            filing_url = f"https://www.sec.gov/Archives/edgar/data/{cik_num}/{accession}/{doc}" if doc else ""
+            filings.append({
+                "form": form,
+                "filingDate": dates[i] if i < len(dates) else "",
+                "description": descriptions[i] if i < len(descriptions) else form,
+                "url": filing_url,
+                "accessionNumber": accessions[i] if i < len(accessions) else "",
+            })
+            if len(filings) >= 25:
+                break
+
+        return jsonify({
+            "symbol": symbol,
+            "cik": cik,
+            "companyName": company["name"],
+            "filings": filings,
+            "edgarUrl": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=&dateb=&owner=include&count=40&search_text=&action=getcompany",
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

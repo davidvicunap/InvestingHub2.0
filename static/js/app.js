@@ -41,17 +41,25 @@ function app() {
         showAddHolding:false, newHolding:{symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
 
         analysisSymbol:'', analysisData:null, analysisStats:[], analysisLoading:false,
-        analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','News','Profile'],
+        analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','News','SEC Filings','Profile'],
         chartPeriod:'1y', techPeriod:'1y',
         fundamentalsData:null, finTab:'income', finPeriod:'annual',
         stockScore:null, stockNews:null, stockNewsLoading:false,
+        secFilings:null, secFilingsLoading:false,
+        scoreCategories:[
+            {key:'profitability',label:'Profitability',desc:'Margins & ROE',weight:25},
+            {key:'growth',label:'Growth',desc:'Revenue & Earnings',weight:20},
+            {key:'valuation',label:'Valuation',desc:'P/E, P/B & PEG',weight:20},
+            {key:'financialHealth',label:'Financial Health',desc:'Debt & Liquidity',weight:20},
+            {key:'momentum',label:'Momentum',desc:'Price Trends',weight:15},
+        ],
 
         compareInput:'', compareData:null, compareLoading:false, comparePeriod:'1y',
         cmpColors:['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4'],
         compareMetrics:[
             {key:'price',label:'Price',format:'price'},{key:'marketCap',label:'Market Cap',format:'mcap'},
             {key:'peRatio',label:'P/E',format:'num'},{key:'forwardPE',label:'Fwd P/E',format:'num'},
-            {key:'eps',label:'EPS',format:'price'},{key:'dividendYield',label:'Div Yield',format:'rpct',colorize:true},
+            {key:'eps',label:'EPS',format:'price'},{key:'dividendYield',label:'Div Yield',format:'pct',colorize:true},
             {key:'beta',label:'Beta',format:'num'},{key:'profitMargin',label:'Profit Margin',format:'pct',colorize:true},
             {key:'returnOnEquity',label:'ROE',format:'pct',colorize:true},
             {key:'revenueGrowth',label:'Rev Growth',format:'pct',colorize:true},
@@ -113,7 +121,7 @@ function app() {
         // ── Nav ──
         navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
-        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol)})},
+        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol);if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
         // ── Helpers ──
         logoUrl(s){if(!s)return'';const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();const d=LOGO_DOMAINS[c];return `https://logo.clearbit.com/${d||c.toLowerCase()+'.com'}`},
@@ -158,6 +166,7 @@ function app() {
         async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
         async loadMarketNews(){this.newsLoading=true;try{const d=await this.api('/api/market-news');this.marketNews=d.news||[]}catch(e){}this.newsLoading=false},
         async loadStockNews(s){if(!s)return;this.stockNewsLoading=true;try{this.stockNews=await this.api(`/api/news/${s}`)}catch(e){}this.stockNewsLoading=false},
+        async loadSecFilings(s){if(!s)return;this.secFilingsLoading=true;try{this.secFilings=await this.api(`/api/sec-filings/${s}`)}catch(e){}this.secFilingsLoading=false},
 
         // ── Watchlist ──
         async loadWatchlist(){this.watchlistLoading=true;try{this.watchlist=await this.api('/api/watchlist')}catch(e){}this.watchlistLoading=false},
@@ -188,13 +197,13 @@ function app() {
         // ── Analysis ──
         async loadAnalysis(s){
             if(!s)return;s=s.toUpperCase().trim();this.analysisSymbol=s;this.analysisLoading=true;
-            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.stockNews=null;this.analysisTab='Chart';
+            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.stockNews=null;this.secFilings=null;this.analysisTab='Chart';
             try{
                 const d=await this.api(`/api/quote/${s}`);this.analysisData=d;
                 this.analysisStats=[
                     {label:'Mkt Cap',value:this.fmtBig(d.marketCap)},{label:'P/E',value:d.peRatio?d.peRatio.toFixed(2):'—'},
                     {label:'Fwd P/E',value:d.forwardPE?d.forwardPE.toFixed(2):'—'},{label:'EPS',value:d.eps?'$'+d.eps.toFixed(2):'—'},
-                    {label:'Div Yield',value:d.dividendYield?d.dividendYield.toFixed(2)+'%':'—'},{label:'Beta',value:d.beta?d.beta.toFixed(2):'—'},
+                    {label:'Div Yield',value:d.dividendYield?(d.dividendYield*100).toFixed(2)+'%':'—'},{label:'Beta',value:d.beta?d.beta.toFixed(2):'—'},
                     {label:'52W High',value:this.fmtP(d.fiftyTwoWeekHigh)},{label:'52W Low',value:this.fmtP(d.fiftyTwoWeekLow)},
                     {label:'Volume',value:d.volume?d.volume.toLocaleString():'—'},{label:'Avg Vol',value:d.avgVolume?d.avgVolume.toLocaleString():'—'},
                     {label:'Profit Margin',value:d.profitMargin?(d.profitMargin*100).toFixed(1)+'%':'—'},{label:'ROE',value:d.returnOnEquity?(d.returnOnEquity*100).toFixed(1)+'%':'—'},
