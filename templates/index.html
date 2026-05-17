@@ -13,6 +13,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script defer src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+    <script defer src="https://s3.tradingview.com/tv.js"></script>
     <script>
         // Apply theme immediately to prevent flash
         (function(){
@@ -599,6 +600,103 @@
                     <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th><template x-for="s in Object.keys(compareData)" :key="s"><th class="text-right p-3.5 fg-0 font-semibold" x-text="s"></th></template></tr></thead>
                     <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData)" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="m.colorize?metricColor(compareData[s]?.[m.key]):'fg-0'" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
                 </table></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ───────── TABLES ───────── -->
+    <div x-show="currentPage==='tables'" x-cloak class="fade">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold fg-0">Tables</h2>
+                <p class="text-[13px] fg-2 mt-0.5">Advanced charting, screener & AI technical analysis assistant</p>
+            </div>
+            <button @click="toggleChat()" class="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-sm font-semibold transition shadow-sm" :class="chatOpen?'bg-brand-600 text-white shadow-brand-600/25':'bg-[var(--bg-2)] fg-1 hover:bg-[var(--bg-3)]'">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                <span x-text="chatOpen?'Close Chat':'AI Assistant'"></span>
+            </button>
+        </div>
+
+        <div class="flex gap-4" :class="chatOpen?'':'flex-col'">
+            <!-- Main content -->
+            <div :class="chatOpen?'flex-1 min-w-0':'w-full'">
+                <!-- TradingView Advanced Chart -->
+                <div class="card overflow-hidden mb-4">
+                    <div class="p-3 flex items-center justify-between" style="border-bottom:1px solid var(--border)">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                            <span class="text-[13px] font-semibold fg-0">TradingView Advanced Chart</span>
+                        </div>
+                        <span class="text-[10px] fg-3 bg-inset px-2 py-0.5 rounded-md font-medium">Sign in to TradingView within the chart for premium features</span>
+                    </div>
+                    <div id="tv-advanced-chart" style="height:520px"></div>
+                </div>
+                <!-- TradingView Screener -->
+                <div class="card overflow-hidden">
+                    <div class="p-3 flex items-center gap-2" style="border-bottom:1px solid var(--border)">
+                        <svg class="w-4 h-4 fg-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        <span class="text-[13px] font-semibold fg-0">Stock Screener</span>
+                    </div>
+                    <div id="tv-screener" class="tradingview-widget-container" style="min-height:500px"></div>
+                </div>
+            </div>
+
+            <!-- AI Chat Panel -->
+            <div x-show="chatOpen" x-cloak class="w-full md:w-[360px] flex-shrink-0">
+                <div class="card flex flex-col" style="height:calc(520px + 56px + 16px + 500px + 56px)">
+                    <!-- Chat header -->
+                    <div class="p-3 flex items-center gap-2 flex-shrink-0" style="border-bottom:1px solid var(--border)">
+                        <div class="w-7 h-7 bg-gradient-to-br from-brand-500 to-violet-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-[13px] font-semibold fg-0">TA Assistant</div>
+                            <div class="text-[10px] fg-3">Ask about indicators, patterns & strategies</div>
+                        </div>
+                        <button @click="chatMessages=[]" class="text-[10px] fg-3 hover:fg-1 transition font-medium">Clear</button>
+                    </div>
+                    <!-- Chat body -->
+                    <div id="chat-body" class="flex-1 overflow-y-auto p-3 space-y-3" style="min-height:0">
+                        <!-- Welcome message -->
+                        <div x-show="!chatMessages.length" class="text-center py-8">
+                            <div class="w-12 h-12 bg-gradient-to-br from-brand-500/20 to-violet-600/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                <svg class="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            </div>
+                            <p class="text-[13px] font-semibold fg-0 mb-1">Technical Analysis Teacher</p>
+                            <p class="text-[11px] fg-3 mb-4 leading-relaxed">Ask me about chart patterns, indicators,<br>candlesticks, risk management & more</p>
+                            <div class="space-y-1.5">
+                                <button @click="chatInput='What is RSI and how do I use it?';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">What is RSI and how do I use it?</button>
+                                <button @click="chatInput='Explain the MACD indicator';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">Explain the MACD indicator</button>
+                                <button @click="chatInput='How do I identify support and resistance levels?';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">How do I identify support &amp; resistance?</button>
+                                <button @click="chatInput='What are the most reliable candlestick patterns?';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">Most reliable candlestick patterns?</button>
+                            </div>
+                        </div>
+                        <!-- Messages -->
+                        <template x-for="(m,i) in chatMessages" :key="i">
+                            <div :class="m.role==='user'?'flex justify-end':'flex justify-start'">
+                                <div :class="m.role==='user'?'bg-brand-600 text-white rounded-2xl rounded-br-md max-w-[85%]':'bg-inset fg-0 rounded-2xl rounded-bl-md max-w-[90%]'" class="px-3.5 py-2.5 text-[12.5px] leading-relaxed">
+                                    <div x-html="fmtChat(m.content)"></div>
+                                </div>
+                            </div>
+                        </template>
+                        <!-- Loading -->
+                        <div x-show="chatLoading" class="flex justify-start">
+                            <div class="bg-inset px-4 py-3 rounded-2xl rounded-bl-md">
+                                <div class="flex gap-1"><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:0ms"></span><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:150ms"></span><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:300ms"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Chat input -->
+                    <div class="p-3 flex-shrink-0" style="border-top:1px solid var(--border)">
+                        <div class="flex gap-2">
+                            <input id="chat-input" type="text" x-model="chatInput" @keydown.enter="sendChat()" placeholder="Ask about technical analysis..." class="flex-1 px-3 py-2.5 rounded-[10px] text-[12.5px] input-f" :disabled="chatLoading">
+                            <button @click="sendChat()" :disabled="chatLoading||!chatInput.trim()" class="px-3 py-2.5 bg-brand-600 text-white rounded-[10px] hover:bg-brand-700 transition disabled:opacity-40 flex-shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            </button>
+                        </div>
+                        <div class="text-[9px] fg-3 mt-1.5 text-center">Educational only — not financial advice</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
