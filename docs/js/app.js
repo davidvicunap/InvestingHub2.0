@@ -80,6 +80,9 @@ function app() {
         ],
 
         apex:{}, tv:{},
+        _apiCache:{},
+        _cacheTTLs:{'/api/market':60,'/api/market-news':180,'/api/watchlist':30,'/api/portfolio':30,'/api/earnings-calendar':120},
+        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/news/',120],['/api/sec-filings/',120],['/api/dividends/',300],['/api/compare?',60]],
 
         init() {
             this.applyTheme();
@@ -124,7 +127,7 @@ function app() {
         },
         logout() {
             this.authToken='';this.currentUser=null;localStorage.removeItem('investorhub-token');localStorage.removeItem('investorhub-user');
-            this.portfolio=[];this.watchlist=[];this.marketData=[];this.currentPage='dashboard';
+            this.portfolio=[];this.watchlist=[];this.marketData=[];this.currentPage='dashboard';this.clearCache();
         },
 
         // ── Theme ──
@@ -149,13 +152,23 @@ function app() {
         timeAgo(ts){if(!ts)return'';const s=(Date.now()/1000-ts);if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'})},
 
         // ── API ──
-        async api(u){
+        _getCacheTTL(u){
+            const exact=this._cacheTTLs[u];if(exact)return exact;
+            for(const[p,t]of this._cachePrefixTTLs)if(u.startsWith(p))return t;
+            return 0;
+        },
+        clearCache(pattern){if(!pattern){this._apiCache={};return}for(const k of Object.keys(this._apiCache))if(k.includes(pattern))delete this._apiCache[k]},
+        async api(u,skipCache){
+            const ttl=this._getCacheTTL(u);
+            if(!skipCache&&ttl){const c=this._apiCache[u];if(c&&(Date.now()/1000-c.t)<ttl)return c.d}
             try{
                 const r=await fetch(API_BASE+u,{headers:this.authH()});
                 if(r.status===401){this.logout();throw new Error('Session expired')}
                 if(!r.ok)throw new Error(r.status);
                 this.connectionError=false;
-                return r.json();
+                const data=await r.json();
+                if(ttl)this._apiCache[u]={d:data,t:Date.now()/1000};
+                return data;
             }catch(e){
                 if(e.message==='Failed to fetch'||e.name==='TypeError')this.connectionError=true;
                 throw e;
@@ -194,15 +207,15 @@ function app() {
 
         // ── Watchlist ──
         async loadWatchlist(){this.watchlistLoading=true;try{this.watchlist=await this.api('/api/watchlist')}catch(e){}this.watchlistLoading=false},
-        async addToWatchlist(s){if(!s)return;await this.post('/api/watchlist',{symbol:s.toUpperCase()});this.loadWatchlist()},
-        async removeFromWatchlist(s){await this.del(`/api/watchlist/${s}`);this.loadWatchlist()},
+        async addToWatchlist(s){if(!s)return;await this.post('/api/watchlist',{symbol:s.toUpperCase()});this.clearCache('/api/watchlist');this.loadWatchlist()},
+        async removeFromWatchlist(s){await this.del(`/api/watchlist/${s}`);this.clearCache('/api/watchlist');this.loadWatchlist()},
 
         // ── Portfolio ──
         async loadPortfolio(){this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false},
-        async addHolding(){if(!this.newHolding.symbol||!this.newHolding.shares||!this.newHolding.buy_price)return;await this.post('/api/portfolio',this.newHolding);this.newHolding={symbol:'',shares:'',buy_price:'',buy_date:'',notes:''};this.showAddHolding=false;this.loadPortfolio()},
-        async deleteHolding(id){await this.del(`/api/portfolio/${id}`);this.loadPortfolio()},
+        async addHolding(){if(!this.newHolding.symbol||!this.newHolding.shares||!this.newHolding.buy_price)return;await this.post('/api/portfolio',this.newHolding);this.newHolding={symbol:'',shares:'',buy_price:'',buy_date:'',notes:''};this.showAddHolding=false;this.clearCache('/api/portfolio');this.loadPortfolio()},
+        async deleteHolding(id){await this.del(`/api/portfolio/${id}`);this.clearCache('/api/portfolio');this.loadPortfolio()},
         openEditHolding(h){this.editingHolding={id:h.id,symbol:h.symbol,shares:h.shares,buy_price:h.buy_price,buy_date:h.buy_date||'',notes:h.notes||''};this.showEditHolding=true},
-        async saveEditHolding(){if(!this.editingHolding.id)return;await this.put(`/api/portfolio/${this.editingHolding.id}`,{shares:parseFloat(this.editingHolding.shares),buy_price:parseFloat(this.editingHolding.buy_price),buy_date:this.editingHolding.buy_date,notes:this.editingHolding.notes});this.showEditHolding=false;this.loadPortfolio()},
+        async saveEditHolding(){if(!this.editingHolding.id)return;await this.put(`/api/portfolio/${this.editingHolding.id}`,{shares:parseFloat(this.editingHolding.shares),buy_price:parseFloat(this.editingHolding.buy_price),buy_date:this.editingHolding.buy_date,notes:this.editingHolding.notes});this.showEditHolding=false;this.clearCache('/api/portfolio');this.loadPortfolio()},
         async analyzePortfolio(){
             if(!this.portfolio.length||this.portfolioReviewLoading)return;
             this.portfolioReviewLoading=true;this.showPortfolioReview=true;this.portfolioReview=null;

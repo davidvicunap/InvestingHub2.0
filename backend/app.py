@@ -148,6 +148,31 @@ def safe_get(d, key, default=None):
         return default
 
 
+# -- Response Cache -----------------------------------------------------------
+
+_resp_cache = {}
+_resp_cache_time = {}
+
+
+def cache_response(ttl):
+    """Cache successful GET responses in memory for `ttl` seconds."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            key = request.full_path
+            now = datetime.utcnow().timestamp()
+            if key in _resp_cache and (now - _resp_cache_time.get(key, 0)) < ttl:
+                return _resp_cache[key]
+            result = f(*args, **kwargs)
+            status = result[1] if isinstance(result, tuple) else 200
+            if 200 <= status < 300:
+                _resp_cache[key] = result
+                _resp_cache_time[key] = now
+            return result
+        return wrapper
+    return decorator
+
+
 # -- API: Health Check --------------------------------------------------------
 
 @app.route("/")
@@ -254,6 +279,7 @@ def api_search():
 # -- API: Quote ---------------------------------------------------------------
 
 @app.route("/api/quote/<symbol>")
+@cache_response(30)
 def api_quote(symbol):
     try:
         t = get_ticker(symbol)
@@ -323,6 +349,7 @@ def api_quote(symbol):
 # -- API: Price History -------------------------------------------------------
 
 @app.route("/api/history/<symbol>")
+@cache_response(60)
 def api_history(symbol):
     period = request.args.get("period", "1y")
     interval = request.args.get("interval", "1d")
@@ -351,6 +378,7 @@ def api_history(symbol):
 # -- API: Fundamentals --------------------------------------------------------
 
 @app.route("/api/fundamentals/<symbol>")
+@cache_response(300)
 def api_fundamentals(symbol):
     try:
         t = get_ticker(symbol)
@@ -392,6 +420,7 @@ def api_fundamentals(symbol):
 # -- API: Market Overview -----------------------------------------------------
 
 @app.route("/api/market")
+@cache_response(60)
 def api_market():
     indices = {
         "^GSPC": "S&P 500",
@@ -407,7 +436,7 @@ def api_market():
 
     def fetch_index(sym, name):
         try:
-            t = yf.Ticker(sym)
+            t = get_ticker(sym)
             info = t.info
             price = safe_get(info, "regularMarketPrice") or safe_get(info, "currentPrice", 0)
             prev = safe_get(info, "previousClose") or safe_get(info, "regularMarketPreviousClose", 0)
@@ -633,6 +662,7 @@ def api_watchlist_delete(symbol):
 # -- API: Technical Indicators ------------------------------------------------
 
 @app.route("/api/technicals/<symbol>")
+@cache_response(60)
 def api_technicals(symbol):
     period = request.args.get("period", "1y")
     try:
@@ -765,6 +795,7 @@ def _analyze_sentiment(title):
 # -- API: News with Sentiment Analysis ----------------------------------------
 
 @app.route("/api/news/<symbol>")
+@cache_response(120)
 def api_news(symbol):
     try:
         news_items = _fetch_yahoo_news(symbol.upper(), count=20)
@@ -790,6 +821,7 @@ def api_news(symbol):
 # -- API: Stock Health Score --------------------------------------------------
 
 @app.route("/api/score/<symbol>")
+@cache_response(300)
 def api_score(symbol):
     try:
         t = get_ticker(symbol)
@@ -1088,6 +1120,7 @@ def _get_sec_cik(symbol):
 
 
 @app.route("/api/sec-filings/<symbol>")
+@cache_response(120)
 def api_sec_filings(symbol):
     import urllib.request
     symbol = symbol.upper().strip()
@@ -1146,6 +1179,7 @@ def api_sec_filings(symbol):
 # -- API: Market News (General) -----------------------------------------------
 
 @app.route("/api/market-news")
+@cache_response(180)
 def api_market_news():
     try:
         major_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META"]
@@ -1444,6 +1478,7 @@ def api_earnings_calendar():
 
 
 @app.route("/api/dividends/<symbol>")
+@cache_response(300)
 def api_dividends(symbol):
     """Returns dividend details and payment history for a symbol."""
     try:
