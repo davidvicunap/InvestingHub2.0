@@ -705,7 +705,10 @@
     <div x-show="currentPage==='portfolio'" x-cloak class="fade">
         <div class="flex items-center justify-between mb-5">
             <div><h2 class="text-xl md:text-2xl font-bold fg-0">Portfolio</h2><p class="text-[13px] fg-2 mt-0.5">Track holdings & performance</p></div>
-            <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
+            <div class="flex items-center gap-2">
+                <button @click="analyzePortfolio()" x-show="portfolio.length" class="px-4 py-2.5 bg-gradient-to-r from-brand-500 to-violet-600 text-white rounded-[10px] text-sm font-semibold hover:opacity-90 transition shadow-sm flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>AI Review</button>
+                <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
+            </div>
         </div>
         <div x-show="portfolio.length" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Value</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="'$'+ptv().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
@@ -733,17 +736,108 @@
                                 <td class="p-3.5 text-right fg-0 font-medium tabular-nums" x-text="'$'+(h.shares*(h.currentPrice||0)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></td>
                                 <td class="p-3.5 text-right font-medium tabular-nums" :class="hpl(h)>=0?'text-emerald-500':'text-red-500'"><span x-text="hpl(h)>=0?'+':'-'"></span>$<span x-text="Math.abs(hpl(h)).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></td>
                                 <td class="p-3.5 text-right font-medium tabular-nums" :class="hret(h)>=0?'text-emerald-500':'text-red-500'"><span x-text="hret(h)>=0?'+':''"></span><span x-text="hret(h).toFixed(2)"></span>%</td>
-                                <td class="p-3.5 text-center"><button @click="deleteHolding(h.id)" class="fg-3 hover:text-red-400 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>
+                                <td class="p-3.5 text-center whitespace-nowrap"><button @click="openEditHolding(h)" class="fg-3 hover:text-brand-400 transition mr-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></button><button @click="deleteHolding(h.id)" class="fg-3 hover:text-red-400 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button></td>
                             </tr>
                         </template>
                     </tbody>
                 </table>
             </div>
         </div>
+        <!-- AI Portfolio Review Panel -->
+        <div x-show="showPortfolioReview" x-cloak class="card mt-5 p-5 fade">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 bg-gradient-to-br from-brand-500 to-violet-600 rounded-lg flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div>
+                    <span class="text-[13px] font-semibold fg-0">AI Portfolio Analysis</span>
+                </div>
+                <button @click="showPortfolioReview=false" class="fg-3 hover:fg-1 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div x-show="portfolioReviewLoading" class="flex items-center gap-3 py-4"><div class="spinner"></div><span class="text-sm fg-2">Analyzing your portfolio...</span></div>
+            <div x-show="!portfolioReviewLoading && portfolioReview" class="text-[13px] fg-1 leading-relaxed" x-html="fmtChat(portfolioReview)"></div>
+            <div class="text-[9px] fg-3 mt-3 text-center">Educational only — not financial advice</div>
+        </div>
+    </div>
+
+    <!-- ───────── CALENDAR ───────── -->
+    <div x-show="currentPage==='calendar'" x-cloak class="fade">
+        <div class="flex items-center justify-between mb-5">
+            <div><h2 class="text-xl md:text-2xl font-bold fg-0">Events Calendar</h2><p class="text-[13px] fg-2 mt-0.5">Upcoming earnings & dividends for your stocks</p></div>
+            <button @click="loadCalendar()" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Refresh</button>
+        </div>
+        <!-- Filters -->
+        <div class="flex gap-2 mb-5">
+            <button @click="calendarFilter='all'" :class="calendarFilter==='all'?'bg-brand-600 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">All</button>
+            <button @click="calendarFilter='earnings'" :class="calendarFilter==='earnings'?'bg-amber-500 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">Earnings</button>
+            <button @click="calendarFilter='dividend'" :class="calendarFilter==='dividend'?'bg-emerald-500 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">Dividends</button>
+        </div>
+        <!-- Loading -->
+        <div x-show="calendarLoading" class="space-y-3"><template x-for="i in 5"><div class="skel h-16"></div></template></div>
+        <!-- Empty state -->
+        <div x-show="!calendarLoading && !calendarEvents.length" class="text-center py-16">
+            <svg class="w-12 h-12 fg-3 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <p class="fg-3 text-sm mb-1">No upcoming events</p>
+            <p class="text-xs fg-3">Add stocks to your watchlist or portfolio to see earnings and dividend dates</p>
+        </div>
+        <!-- Events -->
+        <div x-show="!calendarLoading && filteredCalendarEvents().length" class="space-y-2">
+            <template x-for="(event, idx) in filteredCalendarEvents()" :key="idx">
+                <div class="card card-h p-4 flex items-center gap-4 cursor-pointer" @click="event.type==='dividend'?loadDividendDetail(event.symbol):selectStock(event.symbol)">
+                    <div class="flex-shrink-0 text-center w-14">
+                        <div class="text-[10px] fg-3 font-medium" x-text="calendarDateLabel(event.date)"></div>
+                        <div class="text-lg font-bold fg-0" x-text="new Date(event.date+'T00:00:00').getDate()"></div>
+                        <div class="text-[10px] fg-3" x-text="new Date(event.date+'T00:00:00').toLocaleDateString('en-US',{month:'short'})"></div>
+                    </div>
+                    <div class="w-1.5 h-12 rounded-full flex-shrink-0" :class="event.type==='earnings'?'bg-amber-500':'bg-emerald-500'"></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(event.symbol)" @error="ok=false" loading="lazy"><span x-show="!ok" x-text="event.symbol.charAt(0)"></span></div>
+                            <span class="text-[13px] font-semibold fg-0" x-text="event.symbol"></span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md" :class="event.type==='earnings'?'bg-amber-500/10 text-amber-400':'bg-emerald-500/10 text-emerald-400'" x-text="event.type==='earnings'?'EARNINGS':'DIVIDEND'"></span>
+                        </div>
+                        <div class="text-[11px] fg-3 mt-1">
+                            <template x-if="event.type==='earnings'"><span><span x-show="event.epsEstimate">EPS Est: $<span x-text="event.epsEstimate?.toFixed(2)"></span></span><span x-show="event.epsActual"> | Actual: $<span x-text="event.epsActual?.toFixed(2)"></span></span></span></template>
+                            <template x-if="event.type==='dividend'"><span><span x-show="event.amount">$<span x-text="parseFloat(event.amount).toFixed(2)"></span>/share</span><span x-show="event.yield"> | Yield: <span x-text="(event.yield*100).toFixed(2)"></span>%</span></span></template>
+                        </div>
+                    </div>
+                    <svg class="w-4 h-4 fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </div>
+            </template>
+        </div>
     </div>
 
     </div>
 </main>
+</div>
+
+<!-- Dividend Detail Modal -->
+<div x-show="showDividendDetail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showDividendDetail=false"></div>
+    <div class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold fg-0" x-text="(dividendDetail?.symbol||'')+' Dividends'"></h3>
+            <button @click="showDividendDetail=false" class="fg-3 hover:fg-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div x-show="dividendDetailLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
+        <div x-show="!dividendDetailLoading && dividendDetail">
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Annual Rate</div><div class="text-lg font-bold fg-0 mt-0.5" x-text="dividendDetail?.dividendRate?'$'+dividendDetail.dividendRate.toFixed(2):'—'"></div></div>
+                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Yield</div><div class="text-lg font-bold text-emerald-500 mt-0.5" x-text="dividendDetail?.dividendYield?(dividendDetail.dividendYield*100).toFixed(2)+'%':'—'"></div></div>
+                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Ex-Dividend</div><div class="text-sm font-bold fg-0 mt-0.5" x-text="dividendDetail?.exDividendDate||'—'"></div></div>
+                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Payout Ratio</div><div class="text-sm font-bold fg-0 mt-0.5" x-text="dividendDetail?.payoutRatio?(dividendDetail.payoutRatio*100).toFixed(1)+'%':'—'"></div></div>
+            </div>
+            <div x-show="dividendDetail?.history?.length">
+                <div class="text-[11px] fg-3 font-semibold uppercase tracking-wider mb-2">Payment History</div>
+                <div class="max-h-48 overflow-y-auto space-y-1">
+                    <template x-for="(d, i) in dividendDetail?.history||[]" :key="i">
+                        <div class="flex justify-between py-1.5 px-2 rounded-lg hover:bg-[var(--bg-2)] text-[12px]" style="border-bottom:1px solid var(--border-s)">
+                            <span class="fg-2" x-text="new Date(d.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})"></span>
+                            <span class="fg-0 font-medium" x-text="'$'+d.amount.toFixed(4)"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Mobile nav -->
@@ -771,10 +865,31 @@
                 <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Price *</label><input type="number" x-model="newHolding.buy_price" placeholder="150.00" step="any" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
             </div>
             <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Date</label><input type="date" x-model="newHolding.buy_date" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Notes</label><textarea x-model="newHolding.notes" placeholder="Optional notes..." class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f resize-none" rows="2"></textarea></div>
         </div>
         <div class="flex justify-end gap-2 mt-5">
             <button @click="showAddHolding=false" class="px-4 py-2 text-sm fg-2 hover:fg-0 transition rounded-lg">Cancel</button>
             <button @click="addHolding()" class="px-5 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Add</button>
+        </div>
+    </div>
+</div>
+<!-- Edit Holding -->
+<div x-show="showEditHolding" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showEditHolding=false"></div>
+    <div class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
+        <h3 class="text-base font-bold fg-0 mb-4">Edit Holding</h3>
+        <div class="space-y-3">
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol</label><input type="text" :value="editingHolding.symbol" disabled class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase opacity-60"></div>
+            <div class="grid grid-cols-2 gap-3">
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Shares *</label><input type="number" x-model="editingHolding.shares" step="any" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Price *</label><input type="number" x-model="editingHolding.buy_price" step="any" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            </div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Buy Date</label><input type="date" x-model="editingHolding.buy_date" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <div><label class="text-[11px] fg-3 font-medium block mb-1">Notes</label><textarea x-model="editingHolding.notes" placeholder="Notes..." class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f resize-none" rows="3"></textarea></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button @click="showEditHolding=false" class="px-4 py-2 text-sm fg-2 hover:fg-0 transition rounded-lg">Cancel</button>
+            <button @click="saveEditHolding()" class="px-5 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Save</button>
         </div>
     </div>
 </div>

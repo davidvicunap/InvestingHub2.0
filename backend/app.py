@@ -1283,6 +1283,222 @@ def api_chat():
         return jsonify({"error": str(e)}), 500
 
 
+# -- API: AI Portfolio Review --------------------------------------------------
+
+PORTFOLIO_SYSTEM_PROMPT = """You are a Portfolio Analyst specializing in diversification, risk management, and strategic allocation. Analyze the user's portfolio and provide actionable insights.
+
+Your analysis should cover:
+- **Allocation**: Sector concentration, over/under-weight positions, single-stock risk
+- **Diversification**: Geographic, sector, market-cap diversity; correlation concerns
+- **Risk Assessment**: Beta-weighted exposure, volatility profile, drawdown potential
+- **Performance**: Winners/losers, cost basis efficiency, unrealized gains/losses
+- **Rebalancing**: Specific suggestions to improve risk-adjusted returns
+- **Income**: Dividend coverage, yield-on-cost if applicable
+
+Response guidelines:
+- Be specific and reference actual holdings by ticker
+- Provide 3-5 concrete, prioritized recommendations
+- Mention both risks and strengths
+- Keep total response under 400 words
+- Use bold for key terms and bullet points for clarity
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/portfolio", methods=["POST"])
+@optional_auth
+def api_chat_portfolio():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("portfolio_context"):
+        return jsonify({"error": "portfolio_context required"}), 400
+
+    portfolio_context = data["portfolio_context"]
+    user_message = data.get("message", "Please analyze my portfolio and provide recommendations.")
+
+    messages = [
+        {"role": "system", "content": PORTFOLIO_SYSTEM_PROMPT},
+        {"role": "user", "content": f"Here is my current portfolio:\n\n{portfolio_context}\n\nUser question: {user_message}"}
+    ]
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1500,
+                "temperature": 0.6,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Portfolio analysis failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: Earnings Calendar & Dividends ----------------------------------------
+
+_calendar_cache = {}
+_calendar_cache_time = {}
+_CALENDAR_TTL = 900
+
+
+@app.route("/api/earnings-calendar")
+@optional_auth
+def api_earnings_calendar():
+    """Returns upcoming earnings dates and dividend events for user's tracked stocks."""
+    db = get_db()
+    user = g.current_user
+    symbols = set()
+
+    if user:
+        rows = db.execute("SELECT symbol FROM holdings WHERE user_id = ?", (user["user_id"],)).fetchall()
+        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id = ?", (user["user_id"],)).fetchall()
+    else:
+        rows = db.execute("SELECT symbol FROM holdings WHERE user_id IS NULL").fetchall()
+        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id IS NULL").fetchall()
+
+    for r in rows:
+        symbols.add(r["symbol"])
+    for r in wrows:
+        symbols.add(r["symbol"])
+
+    if not symbols:
+        return jsonify({"events": []})
+
+    events = []
+
+    def fetch_calendar(sym):
+        now = datetime.utcnow().timestamp()
+        cache_key = f"cal_{sym}"
+        if cache_key in _calendar_cache and (now - _calendar_cache_time.get(cache_key, 0)) < _CALENDAR_TTL:
+            return _calendar_cache[cache_key]
+
+        result = []
+        try:
+            t = get_ticker(sym)
+
+            # Earnings dates
+            try:
+                ed = t.earnings_dates
+                if ed is not None and not ed.empty:
+                    for idx in ed.index[:4]:
+                        date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)[:10]
+                        row_data = ed.loc[idx]
+                        result.append({
+                            "symbol": sym,
+                            "type": "earnings",
+                            "date": date_str,
+                            "epsEstimate": float(row_data.get("EPS Estimate", 0)) if pd.notna(row_data.get("EPS Estimate", None)) else None,
+                            "epsActual": float(row_data.get("Reported EPS", 0)) if pd.notna(row_data.get("Reported EPS", None)) else None,
+                            "surprise": float(row_data.get("Surprise(%)", 0)) if pd.notna(row_data.get("Surprise(%)", None)) else None,
+                        })
+            except Exception:
+                pass
+
+            # Dividend info
+            try:
+                info = t.info
+                ex_div = safe_get(info, "exDividendDate")
+                if ex_div:
+                    if isinstance(ex_div, (int, float)):
+                        ex_date = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
+                    else:
+                        ex_date = str(ex_div)[:10]
+                    result.append({
+                        "symbol": sym,
+                        "type": "dividend",
+                        "date": ex_date,
+                        "amount": safe_get(info, "dividendRate", 0),
+                        "yield": safe_get(info, "dividendYield", 0),
+                    })
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        _calendar_cache[cache_key] = result
+        _calendar_cache_time[cache_key] = now
+        return result
+
+    with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as executor:
+        results = list(executor.map(fetch_calendar, symbols))
+
+    for r in results:
+        events.extend(r)
+
+    # Filter to upcoming 90 days
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    future_limit = (datetime.utcnow() + timedelta(days=90)).strftime('%Y-%m-%d')
+    events = [e for e in events if e.get("date") and e["date"] >= today and e["date"] <= future_limit]
+    events.sort(key=lambda x: x.get("date", ""))
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for e in events:
+        key = f"{e['symbol']}_{e['type']}_{e['date']}"
+        if key not in seen:
+            seen.add(key)
+            unique.append(e)
+
+    return jsonify({"events": unique})
+
+
+@app.route("/api/dividends/<symbol>")
+def api_dividends(symbol):
+    """Returns dividend details and payment history for a symbol."""
+    try:
+        t = get_ticker(symbol.upper())
+        info = t.info
+        result = {
+            "symbol": symbol.upper(),
+            "dividendRate": safe_get(info, "dividendRate", 0),
+            "dividendYield": safe_get(info, "dividendYield", 0),
+            "exDividendDate": None,
+            "payoutRatio": safe_get(info, "payoutRatio", 0),
+            "fiveYearAvgDividendYield": safe_get(info, "fiveYearAvgDividendYield", 0),
+            "history": [],
+        }
+
+        ex_div = safe_get(info, "exDividendDate")
+        if ex_div and isinstance(ex_div, (int, float)):
+            result["exDividendDate"] = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
+        elif ex_div:
+            result["exDividendDate"] = str(ex_div)[:10]
+
+        try:
+            divs = t.dividends
+            if divs is not None and not divs.empty:
+                three_years_ago = (datetime.utcnow() - timedelta(days=1095)).strftime('%Y-%m-%d')
+                recent = divs[divs.index >= three_years_ago] if len(divs) > 20 else divs.tail(20)
+                result["history"] = [
+                    {"date": idx.strftime('%Y-%m-%d'), "amount": round(float(val), 4)}
+                    for idx, val in recent.items()
+                ]
+        except Exception:
+            pass
+
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # -- Run ----------------------------------------------------------------------
 
 init_db()

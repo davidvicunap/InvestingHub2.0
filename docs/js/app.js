@@ -33,6 +33,7 @@ function app() {
             {id:'compare',label:'Compare',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>'},
             {id:'tables',label:'Tables',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>'},
             {id:'portfolio',label:'Portfolio',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>'},
+            {id:'calendar',label:'Calendar',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'},
         ],
 
         marketData:[], marketLoading:false,
@@ -40,6 +41,8 @@ function app() {
         marketNews:[], newsLoading:false,
         portfolio:[], portfolioLoading:false,
         showAddHolding:false, newHolding:{symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
+        showEditHolding:false, editingHolding:{id:null,symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
+        portfolioReview:null, portfolioReviewLoading:false, showPortfolioReview:false,
 
         analysisSymbol:'', analysisData:null, analysisStats:[], analysisLoading:false,
         analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','News','SEC Filings','Profile'],
@@ -57,6 +60,9 @@ function app() {
 
         tvWidget:null, tvScreener:null,
         chatOpen:false, chatMessages:[], chatInput:'', chatLoading:false,
+
+        calendarEvents:[], calendarLoading:false, calendarFilter:'all',
+        dividendDetail:null, dividendDetailLoading:false, showDividendDetail:false,
 
         compareInput:'', compareData:null, compareLoading:false, comparePeriod:'1y',
         cmpColors:['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4'],
@@ -123,7 +129,7 @@ function app() {
         reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData)this.renderCmpChart();if(this.portfolio.length)this.renderPortCharts();if(this.currentPage==='tables')this.$nextTick(()=>this.initTvWidgets())},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='tables')this.$nextTick(()=>this.initTvWidgets());if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='tables')this.$nextTick(()=>this.initTvWidgets());if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()});if(p==='calendar')this.loadCalendar()},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
         switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol);if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
@@ -150,6 +156,7 @@ function app() {
             }
         },
         async post(u,d){const r=await fetch(API_BASE+u,{method:'POST',headers:{'Content-Type':'application/json',...this.authH()},body:JSON.stringify(d)});return r.json()},
+        async put(u,d){const r=await fetch(API_BASE+u,{method:'PUT',headers:{'Content-Type':'application/json',...this.authH()},body:JSON.stringify(d)});return r.json()},
         async del(u){await fetch(API_BASE+u,{method:'DELETE',headers:this.authH()})},
         async retryConnection(){this.retrying=true;try{await this.api('/');this.connectionError=false;this.init()}catch(e){}this.retrying=false},
 
@@ -188,6 +195,17 @@ function app() {
         async loadPortfolio(){this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false},
         async addHolding(){if(!this.newHolding.symbol||!this.newHolding.shares||!this.newHolding.buy_price)return;await this.post('/api/portfolio',this.newHolding);this.newHolding={symbol:'',shares:'',buy_price:'',buy_date:'',notes:''};this.showAddHolding=false;this.loadPortfolio()},
         async deleteHolding(id){await this.del(`/api/portfolio/${id}`);this.loadPortfolio()},
+        openEditHolding(h){this.editingHolding={id:h.id,symbol:h.symbol,shares:h.shares,buy_price:h.buy_price,buy_date:h.buy_date||'',notes:h.notes||''};this.showEditHolding=true},
+        async saveEditHolding(){if(!this.editingHolding.id)return;await this.put(`/api/portfolio/${this.editingHolding.id}`,{shares:parseFloat(this.editingHolding.shares),buy_price:parseFloat(this.editingHolding.buy_price),buy_date:this.editingHolding.buy_date,notes:this.editingHolding.notes});this.showEditHolding=false;this.loadPortfolio()},
+        async analyzePortfolio(){
+            if(!this.portfolio.length||this.portfolioReviewLoading)return;
+            this.portfolioReviewLoading=true;this.showPortfolioReview=true;this.portfolioReview=null;
+            const tv=this.ptv();
+            const lines=this.portfolio.map(h=>{const v=(h.currentPrice||0)*h.shares;const pct=tv?(v/tv*100).toFixed(1):0;return`${h.symbol}: ${h.shares} shares @ $${h.buy_price} (now $${(h.currentPrice||0).toFixed(2)}), value $${v.toFixed(2)} (${pct}%), P&L $${this.hpl(h).toFixed(2)} (${this.hret(h).toFixed(1)}%)`});
+            const ctx=[`Total Value: $${tv.toFixed(2)}`,`Total Cost: $${this.ptc().toFixed(2)}`,`Total P&L: $${this.ptp().toFixed(2)} (${this.ptr().toFixed(1)}%)`,`Holdings (${this.portfolio.length}):`,...lines].join('\n');
+            try{const r=await this.post('/api/chat/portfolio',{portfolio_context:ctx});this.portfolioReview=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.portfolioReview='Connection error. Please try again.'}
+            this.portfolioReviewLoading=false;
+        },
         hpl(h){return((h.currentPrice||0)-h.buy_price)*h.shares},
         hret(h){return h.buy_price?(((h.currentPrice||0)-h.buy_price)/h.buy_price)*100:0},
         ptv(){return this.portfolio.reduce((s,h)=>s+(h.currentPrice||0)*h.shares,0)},
@@ -316,6 +334,12 @@ function app() {
                 scrEl.appendChild(s);
             }
         },
+
+        // ── Calendar ──
+        async loadCalendar(){this.calendarLoading=true;try{const d=await this.api('/api/earnings-calendar');this.calendarEvents=d.events||[]}catch(e){this.calendarEvents=[]}this.calendarLoading=false},
+        filteredCalendarEvents(){if(this.calendarFilter==='all')return this.calendarEvents;return this.calendarEvents.filter(e=>e.type===this.calendarFilter)},
+        async loadDividendDetail(symbol){this.dividendDetailLoading=true;this.showDividendDetail=true;this.dividendDetail=null;try{this.dividendDetail=await this.api(`/api/dividends/${symbol}`)}catch(e){}this.dividendDetailLoading=false},
+        calendarDateLabel(ds){const d=new Date(ds+'T00:00:00'),t=new Date();t.setHours(0,0,0,0);const diff=Math.ceil((d-t)/86400000);if(diff===0)return'Today';if(diff===1)return'Tomorrow';if(diff<=7)return d.toLocaleDateString('en-US',{weekday:'short'});return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})},
 
         // ── AI Chat ──
         toggleChat(){this.chatOpen=!this.chatOpen;if(this.chatOpen)this.$nextTick(()=>{const el=document.getElementById('chat-input');if(el)el.focus()})},
