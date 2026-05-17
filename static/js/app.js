@@ -142,7 +142,9 @@ function app() {
         switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol);if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
         // ── Helpers ──
-        logoUrl(s){if(!s)return'';const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();const d=LOGO_DOMAINS[c];return `https://logo.clearbit.com/${d||c.toLowerCase()+'.com'}`},
+        _logoDomain(s){const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();return LOGO_DOMAINS[c]||c.toLowerCase()+'.com'},
+        logoUrl(s){if(!s)return'';return`https://logo.clearbit.com/${this._logoDomain(s)}`},
+        logoFallback(s){if(!s)return'';return`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${this._logoDomain(s)}&size=128`},
         scoreColor(v){return v>=7?'#10b981':v>=5?'#f59e0b':'#ef4444'},
         fmtP(v){if(!v&&v!==0)return'—';return'$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
         fmtBig(v){if(!v)return'—';const n=parseFloat(v);if(n>=1e12)return'$'+(n/1e12).toFixed(2)+'T';if(n>=1e9)return'$'+(n/1e9).toFixed(2)+'B';if(n>=1e6)return'$'+(n/1e6).toFixed(2)+'M';return'$'+n.toLocaleString()},

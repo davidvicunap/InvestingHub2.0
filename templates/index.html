@@ -199,9 +199,10 @@
                 <template x-for="r in searchResults" :key="r.symbol">
                     <button @click="selectStock(r.symbol);showSearchDropdown=false;searchQuery=''"
                         class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-2)] transition text-left" style="border-bottom:1px solid var(--border-s)">
-                        <div class="logo-wrap sm" x-data="{ok:true}">
-                            <img x-show="ok" :src="logoUrl(r.symbol)" @error="ok=false" loading="lazy">
-                            <span x-show="!ok" x-text="r.symbol.charAt(0)"></span>
+                        <div class="logo-wrap sm" x-data="{lvl:0}">
+                            <img x-show="lvl===0" :src="logoUrl(r.symbol)" @error="lvl=1" loading="lazy">
+                            <img x-show="lvl===1" :src="logoFallback(r.symbol)" @error="lvl=2" loading="lazy">
+                            <span x-show="lvl===2" x-text="r.symbol.charAt(0)"></span>
                         </div>
                         <div class="flex-1 min-w-0">
                             <span class="text-sm font-semibold fg-0" x-text="r.symbol"></span>
@@ -276,7 +277,7 @@
                     <template x-for="w in watchlist" :key="w.symbol">
                         <div class="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-[var(--bg-2)] cursor-pointer group transition" @click="selectStock(w.symbol)">
                             <div class="flex items-center gap-2.5">
-                                <div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(w.symbol)" @error="ok=false" loading="lazy"><span x-show="!ok" x-text="w.symbol.charAt(0)"></span></div>
+                                <div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(w.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(w.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="w.symbol.charAt(0)"></span></div>
                                 <div>
                                     <div class="text-[13px] font-semibold fg-0" x-text="w.symbol"></div>
                                     <div class="text-[11px] fg-3 truncate max-w-[120px]" x-text="w.name"></div>
@@ -365,7 +366,7 @@
             <div class="card p-5 mb-4">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <div class="logo-wrap lg" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(analysisData?.symbol)" @error="ok=false" loading="lazy"><span x-show="!ok" x-text="analysisData?.symbol?.charAt(0)" class="text-xl"></span></div>
+                        <div class="logo-wrap lg" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(analysisData?.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(analysisData?.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="analysisData?.symbol?.charAt(0)" class="text-xl"></span></div>
                         <div>
                             <div class="flex items-center gap-2 flex-wrap">
                                 <h3 class="text-lg font-bold fg-0" x-text="analysisData?.name"></h3>
@@ -755,7 +756,7 @@
                     <tbody>
                         <template x-for="h in portfolio" :key="h.id">
                             <tr class="hover:bg-[var(--bg-2)] transition" style="border-bottom:1px solid var(--border-s)">
-                                <td class="p-3.5"><div class="flex items-center gap-2.5"><div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(h.symbol)" @error="ok=false" loading="lazy"><span x-show="!ok" x-text="h.symbol.charAt(0)"></span></div><div><button @click="selectStock(h.symbol)" class="font-semibold text-brand-400 hover:text-brand-300 text-[13px]" x-text="h.symbol"></button><div class="text-[11px] fg-3" x-text="h.name||''"></div></div></div></td>
+                                <td class="p-3.5"><div class="flex items-center gap-2.5"><div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(h.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(h.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="h.symbol.charAt(0)"></span></div><div><button @click="selectStock(h.symbol)" class="font-semibold text-brand-400 hover:text-brand-300 text-[13px]" x-text="h.symbol"></button><div class="text-[11px] fg-3" x-text="h.name||''"></div></div></div></td>
                                 <td class="p-3.5 text-right fg-0 font-medium tabular-nums" x-text="h.shares"></td>
                                 <td class="p-3.5 text-right fg-0 tabular-nums" x-text="'$'+parseFloat(h.buy_price).toFixed(2)"></td>
                                 <td class="p-3.5 text-right fg-0 tabular-nums" x-text="fmtP(h.currentPrice)"></td>
@@ -816,7 +817,7 @@
                     <div class="w-1.5 h-12 rounded-full flex-shrink-0" :class="event.type==='earnings'?'bg-amber-500':'bg-emerald-500'"></div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
-                            <div class="logo-wrap sm" x-data="{ok:true}"><img x-show="ok" :src="logoUrl(event.symbol)" @error="ok=false" loading="lazy"><span x-show="!ok" x-text="event.symbol.charAt(0)"></span></div>
+                            <div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(event.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(event.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="event.symbol.charAt(0)"></span></div>
                             <span class="text-[13px] font-semibold fg-0" x-text="event.symbol"></span>
                             <span class="text-[10px] font-bold px-2 py-0.5 rounded-md" :class="event.type==='earnings'?'bg-amber-500/10 text-amber-400':'bg-emerald-500/10 text-emerald-400'" x-text="event.type==='earnings'?'EARNINGS':'DIVIDEND'"></span>
                         </div>
