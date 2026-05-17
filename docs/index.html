@@ -496,13 +496,14 @@
             <!-- SEC Filings -->
             <div x-show="analysisTab==='SEC Filings'" class="fade">
                 <div x-show="secFilingsLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
-                <div x-show="!secFilingsLoading&&secFilings&&secFilings.filings?.length">
-                    <div class="card overflow-hidden">
+                <div x-show="!secFilingsLoading&&secFilings" class="space-y-4">
+                    <!-- Inline filing list (when backend data available) -->
+                    <div x-show="secFilings?.filings?.length" class="card overflow-hidden">
                         <div class="flex items-center justify-between p-4" style="border-bottom:1px solid var(--border)">
                             <div class="flex items-center gap-2">
                                 <svg class="w-4 h-4 fg-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                <span class="text-[13px] font-semibold fg-0">SEC EDGAR Filings</span>
-                                <span class="text-[11px] fg-3 bg-inset px-2 py-0.5 rounded-md font-medium" x-text="'CIK: '+secFilings?.cik?.replace(/^0+/,'')"></span>
+                                <span class="text-[13px] font-semibold fg-0">Recent Filings</span>
+                                <span x-show="secFilings?.cik" class="text-[11px] fg-3 bg-inset px-2 py-0.5 rounded-md font-medium" x-text="'CIK: '+secFilings?.cik?.replace(/^0+/,'')"></span>
                             </div>
                             <a :href="secFilings?.edgarUrl" target="_blank" rel="noopener" class="text-[11px] text-brand-400 hover:text-brand-300 font-medium flex items-center gap-1">
                                 View all on EDGAR
@@ -524,11 +525,39 @@
                             </template>
                         </div>
                     </div>
-                </div>
-                <div x-show="!secFilingsLoading&&(!secFilings||!secFilings.filings?.length)" x-cloak class="text-center py-16">
-                    <svg class="w-12 h-12 fg-3 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    <p class="text-sm fg-3">No SEC filings found for this ticker</p>
-                    <p class="text-[11px] fg-3 mt-1">SEC filings are available for US-listed companies</p>
+                    <!-- Direct EDGAR links (always shown as quick access, or as primary when backend unavailable) -->
+                    <div class="card p-5">
+                        <div class="flex items-center gap-2 mb-4">
+                            <svg class="w-4 h-4 fg-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                            <span class="text-[13px] font-semibold fg-0" x-text="secFilings?.filings?.length ? 'Quick Access' : 'SEC EDGAR Filings'"></span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                            <a :href="edgarUrl(analysisData?.symbol,'10-K')" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-inset hover:bg-[var(--bg-3)] transition group">
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-brand-500/10 text-brand-400 min-w-[60px] text-center">10-K</span>
+                                <div class="flex-1"><div class="text-[13px] font-medium fg-0">Annual Reports</div><div class="text-[11px] fg-3">Comprehensive yearly financial reports</div></div>
+                                <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                            <a :href="edgarUrl(analysisData?.symbol,'10-Q')" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-inset hover:bg-[var(--bg-3)] transition group">
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-cyan-500/10 text-cyan-400 min-w-[60px] text-center">10-Q</span>
+                                <div class="flex-1"><div class="text-[13px] font-medium fg-0">Quarterly Reports</div><div class="text-[11px] fg-3">Quarterly financial statements</div></div>
+                                <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                            <a :href="edgarUrl(analysisData?.symbol,'8-K')" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-inset hover:bg-[var(--bg-3)] transition group">
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-400 min-w-[60px] text-center">8-K</span>
+                                <div class="flex-1"><div class="text-[13px] font-medium fg-0">Current Reports</div><div class="text-[11px] fg-3">Material events & press releases</div></div>
+                                <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                            <a :href="edgarUrl(analysisData?.symbol,'DEF 14A')" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-inset hover:bg-[var(--bg-3)] transition group">
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-violet-500/10 text-violet-400 min-w-[60px] text-center">DEF 14A</span>
+                                <div class="flex-1"><div class="text-[13px] font-medium fg-0">Proxy Statements</div><div class="text-[11px] fg-3">Shareholder meeting & voting info</div></div>
+                                <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                        </div>
+                        <a :href="edgarUrl(analysisData?.symbol,'')" target="_blank" rel="noopener" class="flex items-center justify-center gap-1.5 mt-3 text-[12px] text-brand-400 hover:text-brand-300 font-medium transition">
+                            View all filings on SEC EDGAR
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
+                    </div>
                 </div>
             </div>
 

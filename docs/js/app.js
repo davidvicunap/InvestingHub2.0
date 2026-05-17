@@ -166,7 +166,14 @@ function app() {
         async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
         async loadMarketNews(){this.newsLoading=true;try{const d=await this.api('/api/market-news');this.marketNews=d.news||[]}catch(e){}this.newsLoading=false},
         async loadStockNews(s){if(!s)return;this.stockNewsLoading=true;try{this.stockNews=await this.api(`/api/news/${s}`)}catch(e){}this.stockNewsLoading=false},
-        async loadSecFilings(s){if(!s)return;this.secFilingsLoading=true;try{this.secFilings=await this.api(`/api/sec-filings/${s}`)}catch(e){}this.secFilingsLoading=false},
+        edgarUrl(sym,form){return`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(sym)}&type=${encodeURIComponent(form)}&dateb=&owner=include&count=10&search_text=&action=getcompany`},
+        async loadSecFilings(s){
+            if(!s)return;this.secFilingsLoading=true;
+            try{this.secFilings=await this.api(`/api/sec-filings/${s}`)}catch(e){
+                this.secFilings={symbol:s,filings:[],fallback:true,edgarUrl:this.edgarUrl(s,'')};
+            }
+            this.secFilingsLoading=false;
+        },
 
         // ── Watchlist ──
         async loadWatchlist(){this.watchlistLoading=true;try{this.watchlist=await this.api('/api/watchlist')}catch(e){}this.watchlistLoading=false},
