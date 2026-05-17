@@ -311,6 +311,8 @@ def api_quote(symbol):
             "currency": safe_get(info, "currency", "USD"),
             "exchange": safe_get(info, "exchange", ""),
             "website": safe_get(info, "website", ""),
+            "country": safe_get(info, "country", ""),
+            "fullTimeEmployees": safe_get(info, "fullTimeEmployees", 0),
             "earningsGrowth": safe_get(info, "earningsGrowth", 0),
             "revenueGrowth": safe_get(info, "revenueGrowth", 0),
             "profitMargin": safe_get(info, "profitMargins", 0),
@@ -1360,6 +1362,195 @@ def api_chat_portfolio():
         result = resp.json()
         if resp.status_code != 200:
             error_msg = result.get("error", {}).get("message", "Portfolio analysis failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Comparison Summary ------------------------------------------------
+
+COMPARE_SYSTEM_PROMPT = """You are a Stock Comparison Analyst. Given side-by-side metrics for multiple stocks, provide a concise, actionable comparison.
+
+Your analysis should cover:
+- **Valuation**: Which stock looks cheaper/more expensive on P/E, PEG, P/B
+- **Growth**: Who's growing faster (revenue, earnings)
+- **Profitability**: Margin & ROE comparison
+- **Risk**: Beta, debt levels, sector-specific risks
+- **Verdict**: Which stock is the better buy and for what type of investor
+
+Response guidelines:
+- Reference each ticker by name
+- Be opinionated — pick a winner with reasoning
+- Keep total response under 350 words
+- Use bold for key terms and bullet points for clarity
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/compare", methods=["POST"])
+@optional_auth
+def api_chat_compare():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("comparison_context"):
+        return jsonify({"error": "comparison_context required"}), 400
+
+    messages = [
+        {"role": "system", "content": COMPARE_SYSTEM_PROMPT},
+        {"role": "user", "content": data["comparison_context"]},
+    ]
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1500,
+                "temperature": 0.6,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Comparison analysis failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Fundamentals Summary ---------------------------------------------
+
+FUNDAMENTALS_SYSTEM_PROMPT = """You are a Fundamental Analysis Expert. Given a company's financial data, provide a clear narrative summary that a retail investor can act on.
+
+Your analysis should cover:
+- **Revenue Trend**: Growing, stagnating, or declining — and why it matters
+- **Profitability**: Margin trajectory, operating leverage, cost discipline
+- **Cash Flow**: Free cash flow health, ability to fund growth & return capital
+- **Balance Sheet**: Leverage, liquidity, and solvency risks
+- **Outlook**: What the numbers suggest about the next 1-2 years
+
+Response guidelines:
+- Use specific numbers from the data provided
+- Highlight the 2-3 most important takeaways
+- Keep total response under 350 words
+- Use bold for key terms and bullet points for clarity
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/fundamentals", methods=["POST"])
+@optional_auth
+def api_chat_fundamentals():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("fundamentals_context"):
+        return jsonify({"error": "fundamentals_context required"}), 400
+
+    messages = [
+        {"role": "system", "content": FUNDAMENTALS_SYSTEM_PROMPT},
+        {"role": "user", "content": data["fundamentals_context"]},
+    ]
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1500,
+                "temperature": 0.6,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Fundamentals analysis failed")
+            return jsonify({"error": error_msg}), resp.status_code
+
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Chart Insight ----------------------------------------------------
+
+CHART_INSIGHT_SYSTEM_PROMPT = """You are a Technical Analysis Expert. Given a stock's current technical indicators, provide a concise, actionable chart read.
+
+Your analysis should cover:
+- **Trend**: Direction based on moving averages (SMA20 vs SMA50, price vs MAs)
+- **Momentum**: RSI reading — overbought, oversold, or neutral
+- **MACD**: Signal crossover status, histogram direction
+- **Bollinger Bands**: Price position relative to bands, squeeze/expansion
+- **Action**: Clear buy/sell/hold signal with specific levels to watch
+
+Response guidelines:
+- Be specific with price levels and indicator values
+- Give a clear directional bias
+- Keep total response under 300 words
+- Use bold for key terms and bullet points for clarity
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/chart-insight", methods=["POST"])
+@optional_auth
+def api_chat_chart_insight():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("chart_context"):
+        return jsonify({"error": "chart_context required"}), 400
+
+    messages = [
+        {"role": "system", "content": CHART_INSIGHT_SYSTEM_PROMPT},
+        {"role": "user", "content": data["chart_context"]},
+    ]
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": 1200,
+                "temperature": 0.6,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Chart insight failed")
             return jsonify({"error": error_msg}), resp.status_code
 
         reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")

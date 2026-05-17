@@ -94,6 +94,11 @@
         .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.03) 100%)}
         html.dark .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.06) 100%)}
 
+        /* AI prose */
+        .ai-prose strong{color:var(--fg-0);font-weight:600}
+        .ai-prose em{font-style:italic}
+        .ai-prose br+br{display:block;content:'';margin-top:.3em}
+
         /* Scrollbar */
         ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg-2)}::-webkit-scrollbar-thumb{background:var(--fg-3);border-radius:3px}
 
@@ -482,12 +487,34 @@
             <div class="pill-bar mb-4 overflow-x-auto"><template x-for="t in analysisTabs" :key="t"><button @click="switchTab(t)" :class="analysisTab===t?'on':''" class="pill" x-text="t"></button></template></div>
 
             <!-- Price Chart -->
-            <div x-show="analysisTab==='Chart'" class="card p-5 fade">
-                <div class="flex items-center justify-between mb-3">
-                    <span class="text-[13px] font-semibold fg-0">Price</span>
-                    <div class="pill-bar"><template x-for="p in ['1mo','3mo','6mo','1y','2y','5y']" :key="p"><button @click="chartPeriod=p;loadPriceChart()" :class="chartPeriod===p?'on':''" class="pill !py-1 !px-2 !text-[11px]" x-text="p"></button></template></div>
+            <div x-show="analysisTab==='Chart'" class="space-y-4 fade">
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[13px] font-semibold fg-0">Price</span>
+                        <div class="flex items-center gap-3">
+                            <div class="pill-bar"><template x-for="p in ['1mo','3mo','6mo','1y','2y','5y']" :key="p"><button @click="chartPeriod=p;loadPriceChart()" :class="chartPeriod===p?'on':''" class="pill !py-1 !px-2 !text-[11px]" x-text="p"></button></template></div>
+                        </div>
+                    </div>
+                    <div id="tv-price" style="height:400px"></div>
                 </div>
-                <div id="tv-price" style="height:400px"></div>
+                <!-- AI Chart Insight -->
+                <div class="card p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
+                                <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <span class="text-[13px] font-semibold fg-0">AI Chart Insight</span>
+                        </div>
+                        <button @click="getChartInsight()" :disabled="chartAiLoading" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition" :class="chartAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
+                            <svg x-show="chartAiLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            <span x-text="chartAiLoading?'Reading chart...':'Get AI Read'"></span>
+                        </button>
+                    </div>
+                    <div x-show="chartAiLoading&&!chartAiInsight" class="space-y-2 py-2"><div class="skel h-3 w-3/4"></div><div class="skel h-3 w-full"></div><div class="skel h-3 w-5/6"></div></div>
+                    <div x-show="chartAiInsight" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(chartAiInsight)"></div>
+                    <p x-show="!chartAiInsight&&!chartAiLoading" class="text-[12px] fg-3">Click "Get AI Read" for an AI-powered technical analysis of the current chart.</p>
+                </div>
             </div>
 
             <!-- Technicals -->
@@ -510,6 +537,24 @@
                 <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
                 <template x-if="fundamentalsData">
                     <div class="space-y-4">
+                        <!-- AI Fundamentals Summary -->
+                        <div class="card p-5">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
+                                        <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                                    </div>
+                                    <span class="text-[13px] font-semibold fg-0">AI Fundamentals Summary</span>
+                                </div>
+                                <button @click="getFundamentalsSummary()" :disabled="fundAiLoading" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition" :class="fundAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
+                                    <svg x-show="fundAiLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                    <span x-text="fundAiLoading?'Analyzing...':'Summarize with AI'"></span>
+                                </button>
+                            </div>
+                            <div x-show="fundAiLoading&&!fundAiSummary" class="space-y-2 py-2"><div class="skel h-3 w-3/4"></div><div class="skel h-3 w-full"></div><div class="skel h-3 w-5/6"></div></div>
+                            <div x-show="fundAiSummary" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(fundAiSummary)"></div>
+                            <p x-show="!fundAiSummary&&!fundAiLoading" class="text-[12px] fg-3">Click "Summarize with AI" for a narrative breakdown of this company's financials.</p>
+                        </div>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Revenue & Net Income</div><div id="f-rev" style="min-height:280px"></div></div>
                             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Margins</div><div id="f-margin" style="min-height:280px"></div></div>
@@ -638,7 +683,44 @@
 
             <!-- Profile -->
             <div x-show="analysisTab==='Profile'" class="space-y-4 fade">
-                <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-2">About</div><p class="text-[13px] fg-2 leading-relaxed" x-text="analysisData?.description"></p></div>
+                <!-- Company Header -->
+                <div class="card p-6">
+                    <div class="flex items-start gap-5">
+                        <div class="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-[var(--bg-2)] shadow-lg" x-data="{lvl:0}">
+                            <img x-show="lvl===0" :src="logoUrl(analysisData?.symbol)" @error="lvl=1" loading="lazy" class="w-full h-full object-contain">
+                            <img x-show="lvl===1" :src="logoFallback(analysisData?.symbol)" @error="lvl=2" loading="lazy" class="w-full h-full object-contain p-2">
+                            <span x-show="lvl===2" x-text="analysisData?.symbol?.charAt(0)" class="text-3xl font-bold fg-3"></span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-lg font-bold fg-0" x-text="analysisData?.name"></h3>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                <span class="text-[11px] fg-2 bg-inset px-2.5 py-1 rounded-lg font-semibold" x-text="analysisData?.symbol"></span>
+                                <span x-show="analysisData?.sector" class="text-[11px] fg-3 bg-inset px-2.5 py-1 rounded-lg" x-text="analysisData?.sector"></span>
+                                <span x-show="analysisData?.industry" class="text-[11px] fg-3 bg-inset px-2.5 py-1 rounded-lg" x-text="analysisData?.industry"></span>
+                            </div>
+                            <a x-show="analysisData?.website" :href="analysisData?.website" target="_blank" rel="noopener" class="inline-flex items-center gap-1 mt-2 text-[12px] text-brand-400 hover:text-brand-300 font-medium transition">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                <span x-text="analysisData?.website?.replace(/^https?:\/\//,'').replace(/\/$/,'')"></span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <!-- About -->
+                <div class="card p-5">
+                    <div class="text-[13px] font-semibold fg-0 mb-2">About</div>
+                    <p class="text-[13px] fg-2 leading-relaxed" x-text="analysisData?.description"></p>
+                </div>
+                <!-- Company Info Grid -->
+                <div class="card p-5">
+                    <div class="text-[13px] font-semibold fg-0 mb-3">Company Info</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Employees</div><div class="text-sm font-bold fg-0 mt-1" x-text="analysisData?.fullTimeEmployees?parseInt(analysisData.fullTimeEmployees).toLocaleString():'N/A'"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Country</div><div class="text-sm font-bold fg-0 mt-1" x-text="analysisData?.country||'N/A'"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Exchange</div><div class="text-sm font-bold fg-0 mt-1" x-text="analysisData?.exchange||'N/A'"></div></div>
+                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Currency</div><div class="text-sm font-bold fg-0 mt-1" x-text="analysisData?.currency||'N/A'"></div></div>
+                    </div>
+                </div>
+                <!-- Analyst Targets -->
                 <div class="card p-5">
                     <div class="text-[13px] font-semibold fg-0 mb-3">Analyst Targets</div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -655,7 +737,7 @@
     <!-- ───────── COMPARE ───────── -->
     <div x-show="currentPage==='compare'" x-cloak class="fade">
         <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Compare</h2>
-        <p class="text-[13px] fg-2 mb-5">Side-by-side up to 5 stocks</p>
+        <p class="text-[13px] fg-2 mb-5">Side-by-side up to 5 stocks with AI analysis</p>
         <div class="card p-5 mb-5">
             <div class="flex flex-wrap items-end gap-3">
                 <div class="flex-1 min-w-[180px]"><label class="text-[11px] fg-3 font-medium block mb-1">Tickers</label><input type="text" x-model="compareInput" @keydown.enter="loadCompare()" placeholder="AAPL, MSFT, GOOGL" class="w-full px-4 py-2.5 rounded-[10px] text-sm input-f"></div>
@@ -665,14 +747,52 @@
             </div>
         </div>
         <div x-show="compareData&&Object.keys(compareData).length" x-cloak>
-            <div class="card p-5 mb-5">
-                <div class="text-[13px] font-semibold fg-0 mb-3">Relative Performance</div>
-                <div id="tv-cmp" style="height:380px"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+                <div class="lg:col-span-2 card p-5">
+                    <div class="text-[13px] font-semibold fg-0 mb-3">Relative Performance</div>
+                    <div id="tv-cmp" style="height:380px"></div>
+                </div>
+                <div class="card p-5">
+                    <div class="text-[13px] font-semibold fg-0 mb-3">Strengths Radar</div>
+                    <div id="cmp-radar" style="min-height:340px"></div>
+                </div>
             </div>
+            <!-- AI Comparison Summary -->
+            <div class="card p-5 mb-5">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <span class="text-[14px] font-bold fg-0">AI Comparison</span>
+                    </div>
+                    <button @click="analyzeComparison()" :disabled="compareAiLoading" class="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition" :class="compareAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
+                        <svg x-show="compareAiLoading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        <svg x-show="!compareAiLoading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span x-text="compareAiLoading?'Analyzing...':'Analyze with AI'"></span>
+                    </button>
+                </div>
+                <div x-show="showCompareAi" x-cloak>
+                    <div x-show="compareAiLoading&&!compareAiSummary" class="space-y-2 py-4"><div class="skel h-4 w-3/4"></div><div class="skel h-4 w-full"></div><div class="skel h-4 w-5/6"></div><div class="skel h-4 w-2/3"></div></div>
+                    <div x-show="compareAiSummary" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(compareAiSummary)"></div>
+                </div>
+            </div>
+            <!-- Comparison Table -->
             <div class="card overflow-hidden">
                 <div class="overflow-x-auto"><table class="w-full text-[13px]">
-                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th><template x-for="s in Object.keys(compareData)" :key="s"><th class="text-right p-3.5 fg-0 font-semibold" x-text="s"></th></template></tr></thead>
-                    <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData)" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="m.colorize?metricColor(compareData[s]?.[m.key]):'fg-0'" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
+                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th>
+                        <template x-for="s in Object.keys(compareData)" :key="s"><th class="text-right p-3.5">
+                            <div class="flex items-center justify-end gap-2">
+                                <div class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 bg-[var(--bg-2)] flex items-center justify-center" x-data="{lvl:0}">
+                                    <img x-show="lvl===0" :src="logoUrl(s)" @error="lvl=1" loading="lazy" class="w-full h-full object-contain">
+                                    <img x-show="lvl===1" :src="logoFallback(s)" @error="lvl=2" loading="lazy" class="w-full h-full object-contain p-0.5">
+                                    <span x-show="lvl===2" x-text="s.charAt(0)" class="text-[10px] font-bold fg-2"></span>
+                                </div>
+                                <span class="fg-0 font-semibold cursor-pointer hover:text-brand-400 transition" x-text="s" @click="selectStock(s)"></span>
+                            </div>
+                        </th></template>
+                    </tr></thead>
+                    <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData)" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="cmpCellClass(s,m.key)" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
                 </table></div>
             </div>
         </div>

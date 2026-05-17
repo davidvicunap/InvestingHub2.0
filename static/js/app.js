@@ -66,18 +66,22 @@ function app() {
         dividendDetail:null, dividendDetailLoading:false, showDividendDetail:false,
 
         compareInput:'', compareData:null, compareLoading:false, comparePeriod:'1y',
+        compareAiSummary:null, compareAiLoading:false, showCompareAi:false,
         cmpColors:['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4'],
         compareMetrics:[
-            {key:'price',label:'Price',format:'price'},{key:'marketCap',label:'Market Cap',format:'mcap'},
-            {key:'peRatio',label:'P/E',format:'num'},{key:'forwardPE',label:'Fwd P/E',format:'num'},
-            {key:'eps',label:'EPS',format:'price'},{key:'dividendYield',label:'Div Yield',format:'pct',colorize:true},
-            {key:'beta',label:'Beta',format:'num'},{key:'profitMargin',label:'Profit Margin',format:'pct',colorize:true},
-            {key:'returnOnEquity',label:'ROE',format:'pct',colorize:true},
-            {key:'revenueGrowth',label:'Rev Growth',format:'pct',colorize:true},
-            {key:'earningsGrowth',label:'Earn Growth',format:'pct',colorize:true},
-            {key:'debtToEquity',label:'D/E',format:'num'},
-            {key:'sector',label:'Sector',format:'txt'},{key:'industry',label:'Industry',format:'txt'},
+            {key:'price',label:'Price',format:'price',hb:null},{key:'marketCap',label:'Market Cap',format:'mcap',hb:true},
+            {key:'peRatio',label:'P/E',format:'num',hb:false},{key:'forwardPE',label:'Fwd P/E',format:'num',hb:false},
+            {key:'eps',label:'EPS',format:'price',hb:true},{key:'dividendYield',label:'Div Yield',format:'pct',colorize:true,hb:true},
+            {key:'beta',label:'Beta',format:'num',hb:null},{key:'profitMargin',label:'Profit Margin',format:'pct',colorize:true,hb:true},
+            {key:'returnOnEquity',label:'ROE',format:'pct',colorize:true,hb:true},
+            {key:'revenueGrowth',label:'Rev Growth',format:'pct',colorize:true,hb:true},
+            {key:'earningsGrowth',label:'Earn Growth',format:'pct',colorize:true,hb:true},
+            {key:'debtToEquity',label:'D/E',format:'num',hb:false},
+            {key:'sector',label:'Sector',format:'txt',hb:null},{key:'industry',label:'Industry',format:'txt',hb:null},
         ],
+
+        chartAiInsight:null, chartAiLoading:false,
+        fundAiSummary:null, fundAiLoading:false,
 
         apex:{}, tv:{},
         _apiCache:{},
@@ -247,7 +251,7 @@ function app() {
         // ── Analysis ──
         async loadAnalysis(s){
             if(!s)return;s=s.toUpperCase().trim();this.analysisSymbol=s;this.analysisLoading=true;
-            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.stockNews=null;this.secFilings=null;this.analysisTab='Chart';
+            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.stockNews=null;this.secFilings=null;this.analysisTab='Chart';this.chartAiInsight=null;this.fundAiSummary=null;
             try{
                 const d=await this.api(`/api/quote/${s}`);this.analysisData=d;
                 this.analysisStats=[
@@ -311,8 +315,61 @@ function app() {
         },
 
         // ── Compare ──
-        async loadCompare(){if(!this.compareInput)return;this.compareLoading=true;try{this.compareData=await this.api(`/api/compare?symbols=${this.compareInput.toUpperCase().replace(/\s/g,'')}&period=${this.comparePeriod}`);this.$nextTick(()=>this.renderCmpChart())}catch(e){}this.compareLoading=false},
+        async loadCompare(){if(!this.compareInput)return;this.compareLoading=true;this.compareAiSummary=null;this.showCompareAi=false;try{this.compareData=await this.api(`/api/compare?symbols=${this.compareInput.toUpperCase().replace(/\s/g,'')}&period=${this.comparePeriod}`);this.$nextTick(()=>{this.renderCmpChart();this.renderCmpRadar()})}catch(e){}this.compareLoading=false},
         renderCmpChart(){if(!this.compareData)return;const ch=this.mkTv('tv-cmp',380);if(!ch)return;Object.keys(this.compareData).forEach((s,i)=>{const p=this.compareData[s]?.prices||[];if(!p.length)return;ch.addLineSeries({color:this.cmpColors[i%5],lineWidth:2,title:s,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)}}).setData(p.map(r=>({time:r.date,value:r.normalized})))});ch.timeScale().fitContent()},
+        renderCmpRadar(){
+            if(!this.compareData)return;const c=this.tc(),syms=Object.keys(this.compareData);
+            const axes=['P/E','Profit Margin','ROE','Rev Growth','D/E'];
+            const keys=['peRatio','profitMargin','returnOnEquity','revenueGrowth','debtToEquity'];
+            const invert=[true,false,false,false,true];
+            const series=syms.map((s,i)=>{
+                const vals=keys.map((k,j)=>{let v=parseFloat(this.compareData[s]?.[k])||0;if(k==='profitMargin'||k==='returnOnEquity'||k==='revenueGrowth')v=v*100;if(invert[j])v=v===0?5:Math.max(0,10-Math.abs(v)/5);else v=Math.min(10,Math.max(0,v/5+5));return Math.round(v*10)/10});
+                return{name:s,data:vals};
+            });
+            this.renderApex('cmp-radar',{chart:{type:'radar',height:340,background:'transparent',toolbar:{show:false}},series,xaxis:{categories:axes,labels:{style:{colors:Array(5).fill(c.at),fontSize:'11px'}}},yaxis:{show:false,max:10},colors:this.cmpColors.slice(0,syms.length),stroke:{width:2},fill:{opacity:.15},markers:{size:3},theme:{mode:c.am},legend:{labels:{colors:c.at},position:'bottom'},plotOptions:{radar:{polygons:{strokeColors:c.ag,connectorColors:c.ag}}}});
+        },
+        cmpCellClass(s,mKey){
+            if(!this.compareData)return'fg-0';const m=this.compareMetrics.find(x=>x.key===mKey);if(!m||m.hb===null||m.format==='txt')return'fg-0';
+            const syms=Object.keys(this.compareData),vals=syms.map(sym=>parseFloat(this.compareData[sym]?.[mKey])||0);
+            const v=parseFloat(this.compareData[s]?.[mKey])||0;const mx=Math.max(...vals),mn=Math.min(...vals);
+            if(vals.every(x=>x===v))return'fg-0';
+            if(m.hb){return v===mx?'text-emerald-500 font-bold':v===mn?'text-red-400':'fg-0'}
+            return v===mn?'text-emerald-500 font-bold':v===mx?'text-red-400':'fg-0';
+        },
+        async analyzeComparison(){
+            if(!this.compareData||this.compareAiLoading)return;
+            this.compareAiLoading=true;this.showCompareAi=true;this.compareAiSummary=null;
+            const syms=Object.keys(this.compareData);
+            const lines=syms.map(s=>{const d=this.compareData[s];return`${s}: Price $${d.price?.toFixed(2)}, MCap ${this.fmtBig(d.marketCap)}, P/E ${d.peRatio?.toFixed(1)||'N/A'}, Fwd P/E ${d.forwardPE?.toFixed(1)||'N/A'}, EPS $${d.eps?.toFixed(2)||'N/A'}, Div Yield ${d.dividendYield?(d.dividendYield*100).toFixed(2)+'%':'N/A'}, Beta ${d.beta?.toFixed(2)||'N/A'}, Profit Margin ${d.profitMargin?(d.profitMargin*100).toFixed(1)+'%':'N/A'}, ROE ${d.returnOnEquity?(d.returnOnEquity*100).toFixed(1)+'%':'N/A'}, Rev Growth ${d.revenueGrowth?(d.revenueGrowth*100).toFixed(1)+'%':'N/A'}, Earn Growth ${d.earningsGrowth?(d.earningsGrowth*100).toFixed(1)+'%':'N/A'}, D/E ${d.debtToEquity?.toFixed(1)||'N/A'}, Sector: ${d.sector||'N/A'}`});
+            const ctx=`Compare these stocks side by side:\n\n${lines.join('\n')}`;
+            try{const r=await this.post('/api/chat/compare',{comparison_context:ctx});this.compareAiSummary=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.compareAiSummary='Connection error. Please try again.'}
+            this.compareAiLoading=false;
+        },
+        async getChartInsight(){
+            if(!this.analysisData||this.chartAiLoading)return;
+            this.chartAiLoading=true;this.chartAiInsight=null;
+            const s=this.analysisData.symbol;
+            try{
+                const t=await this.api(`/api/technicals/${s}?period=${this.chartPeriod}`);
+                if(!t||!t.length){this.chartAiInsight='No technical data available.';this.chartAiLoading=false;return}
+                const last=t[t.length-1];
+                const ctx=`Stock: ${s} (${this.analysisData.name})\nCurrent Price: $${this.analysisData.price?.toFixed(2)}\nPeriod: ${this.chartPeriod}\n\nLatest Technical Indicators:\n- SMA20: ${last.SMA20?.toFixed(2)||'N/A'}\n- SMA50: ${last.SMA50?.toFixed(2)||'N/A'}\n- RSI(14): ${last.RSI?.toFixed(1)||'N/A'}\n- MACD: ${last.MACD?.toFixed(3)||'N/A'}\n- MACD Signal: ${last.Signal?.toFixed(3)||'N/A'}\n- MACD Histogram: ${last.MACD_Hist?.toFixed(3)||'N/A'}\n- Bollinger Upper: ${last.BB_Upper?.toFixed(2)||'N/A'}\n- Bollinger Lower: ${last.BB_Lower?.toFixed(2)||'N/A'}\n- Close: ${last.Close?.toFixed(2)||'N/A'}\n\nPrice vs SMA20: ${last.Close>last.SMA20?'Above':'Below'}\nPrice vs SMA50: ${last.Close>last.SMA50?'Above':'Below'}\nSMA20 vs SMA50: ${last.SMA20>last.SMA50?'Bullish crossover':'Bearish crossover'}`;
+                const r=await this.post('/api/chat/chart-insight',{chart_context:ctx});this.chartAiInsight=r.reply||r.error||'Unable to generate insight.';
+            }catch(e){this.chartAiInsight='Connection error. Please try again.'}
+            this.chartAiLoading=false;
+        },
+        async getFundamentalsSummary(){
+            if(!this.fundamentalsData||!this.analysisData||this.fundAiLoading)return;
+            this.fundAiLoading=true;this.fundAiSummary=null;
+            const fd=this.fundamentalsData,s=this.analysisData.symbol;
+            const fk=Object.keys(fd.financials||{}).sort(),ck=Object.keys(fd.cashflow||{}).sort(),bk=Object.keys(fd.balanceSheet||{}).sort();
+            let ctx=`Stock: ${s} (${this.analysisData.name})\nSector: ${this.analysisData.sector}\nPrice: $${this.analysisData.price?.toFixed(2)}\n\n`;
+            if(fk.length){ctx+='Income Statement (annual, $M):\n';for(const d of fk.slice(-4)){const r=fd.financials[d];ctx+=`${d.substring(0,4)}: Revenue ${Math.round((r?.['Total Revenue']||0)/1e6)}, Net Income ${Math.round((r?.['Net Income']||0)/1e6)}, Gross Profit ${Math.round((r?.['Gross Profit']||0)/1e6)}, Operating Income ${Math.round((r?.['Operating Income']||0)/1e6)}\n`}}
+            if(ck.length){ctx+='\nCash Flow (annual, $M):\n';for(const d of ck.slice(-4)){const r=fd.cashflow[d];ctx+=`${d.substring(0,4)}: Op CF ${Math.round((r?.['Operating Cash Flow']||0)/1e6)}, CapEx ${Math.round((r?.['Capital Expenditure']||0)/1e6)}, FCF ${Math.round(((r?.['Operating Cash Flow']||0)+(r?.['Capital Expenditure']||0))/1e6)}\n`}}
+            if(bk.length){ctx+='\nBalance Sheet (latest, $M):\n';const r=fd.balanceSheet[bk[bk.length-1]];ctx+=`Total Assets ${Math.round((r?.['Total Assets']||0)/1e6)}, Total Liabilities ${Math.round((r?.['Total Liabilities Net Minority Interest']||0)/1e6)}, Cash ${Math.round((r?.['Cash And Cash Equivalents']||0)/1e6)}, Total Debt ${Math.round((r?.['Total Debt']||0)/1e6)}, Equity ${Math.round((r?.['Stockholders Equity']||0)/1e6)}\n`}
+            try{const r=await this.post('/api/chat/fundamentals',{fundamentals_context:ctx});this.fundAiSummary=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.fundAiSummary='Connection error. Please try again.'}
+            this.fundAiLoading=false;
+        },
 
         // ── Apex ──
         renderApex(id,opts){if(typeof ApexCharts==='undefined')return;if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
