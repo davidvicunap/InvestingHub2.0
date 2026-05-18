@@ -1,12 +1,10 @@
 import json
 import sqlite3
 import os
-import re
-import hashlib
 from datetime import datetime, timedelta
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, Response, stream_with_context
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
@@ -14,6 +12,7 @@ import numpy as np
 import jwt
 import bcrypt
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+import requests as http_requests
 
 app = Flask(__name__)
 CORS(app)
@@ -458,14 +457,15 @@ def api_market():
 # -- API: Compare Stocks ------------------------------------------------------
 
 @app.route("/api/compare")
+@cache_response(60)
 def api_compare():
     symbols = request.args.get("symbols", "").split(",")
     symbols = [s.strip().upper() for s in symbols if s.strip()]
     if not symbols:
         return jsonify({"error": "No symbols provided"}), 400
     period = request.args.get("period", "1y")
-    results = {}
-    for sym in symbols[:5]:
+
+    def fetch_stock(sym):
         try:
             t = get_ticker(sym)
             info = t.info
@@ -479,7 +479,7 @@ def api_compare():
                         "close": round(float(row["Close"]), 2),
                         "normalized": round(float(row["Close"]) / first_close * 100, 2) if first_close else 0,
                     })
-            results[sym] = {
+            return sym, {
                 "name": safe_get(info, "longName") or safe_get(info, "shortName", sym),
                 "price": safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0),
                 "marketCap": safe_get(info, "marketCap", 0),
@@ -500,7 +500,12 @@ def api_compare():
                 "prices": prices,
             }
         except Exception as e:
-            results[sym] = {"error": str(e)}
+            return sym, {"error": str(e)}
+
+    with ThreadPoolExecutor(max_workers=min(len(symbols[:5]), 5)) as executor:
+        futures = [executor.submit(fetch_stock, sym) for sym in symbols[:5]]
+        results = dict(f.result() for f in futures)
+
     return jsonify(results)
 
 
@@ -1218,6 +1223,36 @@ def api_market_news():
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 CHAT_MODEL = os.environ.get("CHAT_MODEL", "minimax/minimax-01")
 
+
+def _call_openrouter(messages, max_tokens=1200, temperature=0.6):
+    if not OPENROUTER_API_KEY:
+        return None, ("Chat API not configured", 503)
+    try:
+        resp = http_requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://davidvicunap.github.io",
+                "X-Title": "InvestorHub",
+            },
+            json={
+                "model": CHAT_MODEL,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            },
+            timeout=45,
+        )
+        result = resp.json()
+        if resp.status_code != 200:
+            error_msg = result.get("error", {}).get("message", "Request failed")
+            return None, (error_msg, resp.status_code)
+        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+        return reply, None
+    except Exception as e:
+        return None, (str(e), 500)
+
 TA_SYSTEM_PROMPT = """You are a Technical Analysis (TA) expert and teacher, trained in the style of the New York Institute of Finance curriculum. Your role is to educate users about technical analysis clearly and concisely.
 
 Your knowledge covers:
@@ -1263,43 +1298,14 @@ Your knowledge covers:
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
     data = request.get_json()
     if not data or not data.get("messages"):
         return jsonify({"error": "messages required"}), 400
-
-    user_messages = data["messages"][-20:]
-    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + user_messages
-
-    try:
-        import requests as req
-        resp = req.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": 1024,
-                "temperature": 0.7,
-            },
-            timeout=30,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Chat request failed")
-            return jsonify({"error": error_msg}), resp.status_code
-
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + data["messages"][-20:]
+    reply, err = _call_openrouter(messages, max_tokens=1024, temperature=0.7)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
 
 
 # -- API: AI Portfolio Review --------------------------------------------------
@@ -1326,48 +1332,18 @@ Response guidelines:
 @app.route("/api/chat/portfolio", methods=["POST"])
 @optional_auth
 def api_chat_portfolio():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
     data = request.get_json()
     if not data or not data.get("portfolio_context"):
         return jsonify({"error": "portfolio_context required"}), 400
-
-    portfolio_context = data["portfolio_context"]
     user_message = data.get("message", "Please analyze my portfolio and provide recommendations.")
-
     messages = [
         {"role": "system", "content": PORTFOLIO_SYSTEM_PROMPT},
-        {"role": "user", "content": f"Here is my current portfolio:\n\n{portfolio_context}\n\nUser question: {user_message}"}
+        {"role": "user", "content": f"Here is my current portfolio:\n\n{data['portfolio_context']}\n\nUser question: {user_message}"}
     ]
-
-    try:
-        import requests as req
-        resp = req.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": 1500,
-                "temperature": 0.6,
-            },
-            timeout=45,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Portfolio analysis failed")
-            return jsonify({"error": error_msg}), resp.status_code
-
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    reply, err = _call_openrouter(messages, max_tokens=1500)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
 
 
 # -- API: AI Comparison Summary ------------------------------------------------
@@ -1392,45 +1368,17 @@ Response guidelines:
 @app.route("/api/chat/compare", methods=["POST"])
 @optional_auth
 def api_chat_compare():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
     data = request.get_json()
     if not data or not data.get("comparison_context"):
         return jsonify({"error": "comparison_context required"}), 400
-
     messages = [
         {"role": "system", "content": COMPARE_SYSTEM_PROMPT},
         {"role": "user", "content": data["comparison_context"]},
     ]
-
-    try:
-        import requests as req
-        resp = req.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": 1500,
-                "temperature": 0.6,
-            },
-            timeout=45,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Comparison analysis failed")
-            return jsonify({"error": error_msg}), resp.status_code
-
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    reply, err = _call_openrouter(messages, max_tokens=1500)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
 
 
 # -- API: AI Fundamentals Summary ---------------------------------------------
@@ -1455,45 +1403,17 @@ Response guidelines:
 @app.route("/api/chat/fundamentals", methods=["POST"])
 @optional_auth
 def api_chat_fundamentals():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
     data = request.get_json()
     if not data or not data.get("fundamentals_context"):
         return jsonify({"error": "fundamentals_context required"}), 400
-
     messages = [
         {"role": "system", "content": FUNDAMENTALS_SYSTEM_PROMPT},
         {"role": "user", "content": data["fundamentals_context"]},
     ]
-
-    try:
-        import requests as req
-        resp = req.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": 1500,
-                "temperature": 0.6,
-            },
-            timeout=45,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Fundamentals analysis failed")
-            return jsonify({"error": error_msg}), resp.status_code
-
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    reply, err = _call_openrouter(messages, max_tokens=1500)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
 
 
 # -- API: AI Chart Insight ----------------------------------------------------
@@ -1518,45 +1438,17 @@ Response guidelines:
 @app.route("/api/chat/chart-insight", methods=["POST"])
 @optional_auth
 def api_chat_chart_insight():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
     data = request.get_json()
     if not data or not data.get("chart_context"):
         return jsonify({"error": "chart_context required"}), 400
-
     messages = [
         {"role": "system", "content": CHART_INSIGHT_SYSTEM_PROMPT},
         {"role": "user", "content": data["chart_context"]},
     ]
-
-    try:
-        import requests as req
-        resp = req.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": 1200,
-                "temperature": 0.6,
-            },
-            timeout=45,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Chart insight failed")
-            return jsonify({"error": error_msg}), resp.status_code
-
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    reply, err = _call_openrouter(messages)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
 
 
 # -- API: Earnings Calendar & Dividends ----------------------------------------
@@ -1706,6 +1598,300 @@ def api_dividends(symbol):
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# -- API: AI Watchlist Digest -------------------------------------------------
+
+WATCHLIST_DIGEST_PROMPT = """You are a Market Analyst providing a daily watchlist briefing. Given the user's watchlist with current prices and changes, provide a concise, actionable summary.
+
+Your briefing should cover:
+- **Top Movers**: Biggest gainers and losers today with context
+- **Key Levels**: Any stocks near 52-week highs/lows or significant support/resistance
+- **Alerts**: Unusual moves, high volume, or notable patterns
+- **Outlook**: Brief market context and what to watch for
+
+Response guidelines:
+- Be specific with ticker names and numbers
+- Prioritize actionable information
+- Keep total response under 300 words
+- Use bold for key terms and bullet points
+- Remind user this is educational, not financial advice"""
+
+
+@app.route("/api/chat/watchlist-digest", methods=["POST"])
+@optional_auth
+def api_chat_watchlist_digest():
+    data = request.get_json()
+    if not data or not data.get("watchlist_context"):
+        return jsonify({"error": "watchlist_context required"}), 400
+    messages = [
+        {"role": "system", "content": WATCHLIST_DIGEST_PROMPT},
+        {"role": "user", "content": data["watchlist_context"]},
+    ]
+    reply, err = _call_openrouter(messages)
+    if err:
+        return jsonify({"error": err[0]}), err[1]
+    return jsonify({"reply": reply})
+
+
+# -- API: Sector Peers --------------------------------------------------------
+
+@app.route("/api/peers/<symbol>")
+@cache_response(300)
+def api_peers(symbol):
+    try:
+        t = get_ticker(symbol.upper())
+        info = t.info
+        sector = safe_get(info, "sector", "")
+        industry = safe_get(info, "industry", "")
+        if not sector:
+            return jsonify({"peers": [], "sector": "", "industry": ""})
+
+        sector_peers = {
+            "Technology": ["AAPL", "MSFT", "GOOGL", "META", "NVDA", "AMZN", "CRM", "ORCL", "ADBE", "INTC", "AMD", "CSCO", "IBM", "AVGO", "QCOM", "PLTR", "SNOW", "NET", "CRWD", "DDOG"],
+            "Communication Services": ["GOOGL", "META", "NFLX", "DIS", "SPOT", "SNAP", "ZM"],
+            "Consumer Cyclical": ["AMZN", "TSLA", "HD", "NKE", "MCD", "SBUX", "TGT", "LOW", "BKNG", "ABNB", "RIVN"],
+            "Consumer Defensive": ["WMT", "COST", "KO", "PEP", "PG"],
+            "Financial Services": ["JPM", "BAC", "GS", "MS", "WFC", "V", "MA", "SOFI", "HOOD", "COIN"],
+            "Healthcare": ["JNJ", "PFE", "UNH", "MRNA", "LLY", "ABBV", "TMO", "ABT"],
+            "Energy": ["XOM", "CVX", "COP", "SLB", "EOG"],
+            "Industrials": ["BA", "CAT", "HON", "GE", "UPS", "RTX", "DE"],
+            "Real Estate": ["PLD", "AMT", "CCI", "SPG", "O"],
+            "Utilities": ["NEE", "DUK", "SO", "D", "AEP"],
+            "Basic Materials": ["LIN", "APD", "ECL", "SHW", "NEM", "FCX"],
+        }
+
+        candidates = sector_peers.get(sector, [])
+        sym_upper = symbol.upper()
+        candidates = [c for c in candidates if c != sym_upper][:6]
+
+        peers = []
+
+        def fetch_peer(sym):
+            try:
+                pt = get_ticker(sym)
+                pi = pt.info
+                return {
+                    "symbol": sym,
+                    "name": safe_get(pi, "longName") or safe_get(pi, "shortName", sym),
+                    "price": safe_get(pi, "currentPrice") or safe_get(pi, "regularMarketPrice", 0),
+                    "changePercent": round(
+                        ((safe_get(pi, "currentPrice") or safe_get(pi, "regularMarketPrice", 0))
+                         - (safe_get(pi, "previousClose", 0) or 0))
+                        / (safe_get(pi, "previousClose", 1) or 1) * 100, 2
+                    ),
+                    "marketCap": safe_get(pi, "marketCap", 0),
+                    "peRatio": safe_get(pi, "trailingPE", 0),
+                    "sector": safe_get(pi, "sector", ""),
+                    "industry": safe_get(pi, "industry", ""),
+                }
+            except Exception:
+                return None
+
+        with ThreadPoolExecutor(max_workers=min(len(candidates), 6)) as executor:
+            results = list(executor.map(fetch_peer, candidates))
+
+        peers = [r for r in results if r is not None]
+
+        return jsonify({
+            "symbol": sym_upper,
+            "sector": sector,
+            "industry": industry,
+            "peers": peers,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: Portfolio Optimizer --------------------------------------------------
+
+@app.route("/api/portfolio/optimize", methods=["POST"])
+@require_auth
+def api_portfolio_optimize():
+    data = request.get_json()
+    symbols = data.get("symbols", [])
+    if not symbols or len(symbols) < 2:
+        return jsonify({"error": "At least 2 symbols required"}), 400
+
+    try:
+        prices = {}
+        for sym in symbols[:10]:
+            t = get_ticker(sym)
+            df = t.history(period="1y")
+            if not df.empty:
+                prices[sym] = df["Close"]
+
+        if len(prices) < 2:
+            return jsonify({"error": "Insufficient price data"}), 400
+
+        price_df = pd.DataFrame(prices).dropna()
+        if len(price_df) < 30:
+            return jsonify({"error": "Insufficient history"}), 400
+
+        returns = price_df.pct_change().dropna()
+        mean_returns = returns.mean() * 252
+        cov_matrix = returns.cov() * 252
+        n = len(prices)
+        risk_free = 0.05
+
+        num_portfolios = 3000
+        results = np.zeros((3, num_portfolios))
+        weights_record = []
+
+        for i in range(num_portfolios):
+            w = np.random.random(n)
+            w /= w.sum()
+            p_ret = np.dot(w, mean_returns)
+            p_vol = np.sqrt(np.dot(w.T, np.dot(cov_matrix, w)))
+            sharpe = (p_ret - risk_free) / p_vol if p_vol > 0 else 0
+            results[0, i] = p_vol
+            results[1, i] = p_ret
+            results[2, i] = sharpe
+            weights_record.append(w)
+
+        max_sharpe_idx = results[2].argmax()
+        min_vol_idx = results[0].argmin()
+
+        optimal_weights = weights_record[max_sharpe_idx]
+        min_vol_weights = weights_record[min_vol_idx]
+
+        frontier = []
+        for i in range(num_portfolios):
+            frontier.append({
+                "risk": round(float(results[0, i]) * 100, 2),
+                "return": round(float(results[1, i]) * 100, 2),
+                "sharpe": round(float(results[2, i]), 3),
+            })
+
+        frontier.sort(key=lambda x: x["risk"])
+        step = max(1, len(frontier) // 200)
+        frontier = frontier[::step]
+
+        return jsonify({
+            "symbols": list(prices.keys()),
+            "optimal": {
+                "weights": {sym: round(float(w), 4) for sym, w in zip(prices.keys(), optimal_weights)},
+                "return": round(float(results[1, max_sharpe_idx]) * 100, 2),
+                "risk": round(float(results[0, max_sharpe_idx]) * 100, 2),
+                "sharpe": round(float(results[2, max_sharpe_idx]), 3),
+            },
+            "minVol": {
+                "weights": {sym: round(float(w), 4) for sym, w in zip(prices.keys(), min_vol_weights)},
+                "return": round(float(results[1, min_vol_idx]) * 100, 2),
+                "risk": round(float(results[0, min_vol_idx]) * 100, 2),
+                "sharpe": round(float(results[2, min_vol_idx]), 3),
+            },
+            "frontier": frontier,
+            "annualReturns": {sym: round(float(v) * 100, 2) for sym, v in mean_returns.items()},
+            "correlation": {
+                sym: {s2: round(float(v), 3) for s2, v in row.items()}
+                for sym, row in returns.corr().iterrows()
+            },
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: Earnings History (Surprise Tracker) ----------------------------------
+
+@app.route("/api/earnings-history/<symbol>")
+@cache_response(300)
+def api_earnings_history(symbol):
+    try:
+        t = get_ticker(symbol.upper())
+        ed = t.earnings_dates
+        history = []
+        if ed is not None and not ed.empty:
+            for idx in ed.index[:12]:
+                date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)[:10]
+                row_data = ed.loc[idx]
+                estimate = float(row_data.get("EPS Estimate", 0)) if pd.notna(row_data.get("EPS Estimate", None)) else None
+                actual = float(row_data.get("Reported EPS", 0)) if pd.notna(row_data.get("Reported EPS", None)) else None
+                surprise = float(row_data.get("Surprise(%)", 0)) if pd.notna(row_data.get("Surprise(%)", None)) else None
+                beat = None
+                if estimate is not None and actual is not None:
+                    beat = actual > estimate
+                history.append({
+                    "date": date_str,
+                    "epsEstimate": estimate,
+                    "epsActual": actual,
+                    "surprise": surprise,
+                    "beat": beat,
+                })
+
+        return jsonify({
+            "symbol": symbol.upper(),
+            "history": history,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# -- API: Streaming AI Chat ---------------------------------------------------
+
+@app.route("/api/chat/stream", methods=["POST"])
+@optional_auth
+def api_chat_stream():
+    if not OPENROUTER_API_KEY:
+        return jsonify({"error": "Chat API not configured"}), 503
+
+    data = request.get_json()
+    if not data or not data.get("messages"):
+        return jsonify({"error": "messages required"}), 400
+
+    user_messages = data["messages"][-20:]
+    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + user_messages
+
+    def generate():
+        try:
+            resp = http_requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://davidvicunap.github.io",
+                    "X-Title": "InvestorHub",
+                },
+                json={
+                    "model": CHAT_MODEL,
+                    "messages": messages,
+                    "max_tokens": 1200,
+                    "temperature": 0.7,
+                    "stream": True,
+                },
+                timeout=60,
+                stream=True,
+            )
+
+            if resp.status_code != 200:
+                yield f"data: {json.dumps({'error': 'API error'})}\n\n"
+                return
+
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+                line_str = line.decode("utf-8")
+                if line_str.startswith("data: "):
+                    payload = line_str[6:]
+                    if payload.strip() == "[DONE]":
+                        yield "data: [DONE]\n\n"
+                        return
+                    try:
+                        chunk = json.loads(payload)
+                        delta = chunk.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+                        if content:
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        content_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # -- Run ----------------------------------------------------------------------
