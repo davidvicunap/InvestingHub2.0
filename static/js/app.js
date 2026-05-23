@@ -19,7 +19,7 @@ function app() {
     return {
         currentPage:'dashboard', searchQuery:'', searchResults:[], showSearchDropdown:false,
         darkMode: localStorage.getItem('investorhub-theme') !== 'light',
-        connectionError:false, retrying:false,
+        connectionError:false, retrying:false, backendWaking:false,
 
         authToken: localStorage.getItem('investorhub-token')||'',
         currentUser: JSON.parse(localStorage.getItem('investorhub-user')||'null'),
@@ -95,10 +95,16 @@ function app() {
 
         init() {
             this.applyTheme();
+            this._warmBackend();
             if(this.authToken){
                 this.loadMarketData(); this.loadWatchlist(); this.loadPortfolio();
             }
             this._waitForLibs();
+        },
+        async _warmBackend(){
+            this.backendWaking=true;
+            try{await fetch(API_BASE+'/',{signal:AbortSignal.timeout(45000)});this.connectionError=false}catch(e){this.connectionError=true}
+            this.backendWaking=false;
         },
         _chartsReady:false,
         _waitForLibs(){
@@ -110,28 +116,30 @@ function app() {
         authH() { return this.authToken ? {'Authorization':`Bearer ${this.authToken}`} : {} },
         async login() {
             this.authError=''; this.authLoading=true;
+            if(this.backendWaking){this.authError='Server is starting up, please wait a moment...';this.authLoading=false;return}
             try {
-                const r=await fetch(API_BASE+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.loginForm)});
+                const r=await fetch(API_BASE+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.loginForm),signal:AbortSignal.timeout(30000)});
                 const d=await r.json();
                 if(!r.ok){this.authError=d.error||'Failed';this.authLoading=false;return}
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
                 this.showLoginModal=false;this.loginForm={email:'',password:''};
                 this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
-            } catch(e){this.authError='Connection error'}
+            } catch(e){this.authError=e.name==='TimeoutError'?'Server is waking up — please try again in a few seconds.':'Connection error — the server may be starting up. Please try again.'}
             this.authLoading=false;
         },
         async register() {
             this.authError=''; this.authLoading=true;
+            if(this.backendWaking){this.authError='Server is starting up, please wait a moment...';this.authLoading=false;return}
             try {
-                const r=await fetch(API_BASE+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.registerForm)});
+                const r=await fetch(API_BASE+'/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(this.registerForm),signal:AbortSignal.timeout(30000)});
                 const d=await r.json();
                 if(!r.ok){this.authError=d.error||'Failed';this.authLoading=false;return}
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
                 this.showRegisterModal=false;this.registerForm={name:'',email:'',password:''};
                 this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
-            } catch(e){this.authError='Connection error'}
+            } catch(e){this.authError=e.name==='TimeoutError'?'Server is waking up — please try again in a few seconds.':'Connection error — the server may be starting up. Please try again.'}
             this.authLoading=false;
         },
         logout() {
@@ -152,8 +160,8 @@ function app() {
 
         // ── Helpers ──
         _logoDomain(s){const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();return LOGO_DOMAINS[c]||c.toLowerCase()+'.com'},
-        logoUrl(s){if(!s)return'';return`https://logo.clearbit.com/${this._logoDomain(s)}`},
-        logoFallback(s){if(!s)return'';return`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${this._logoDomain(s)}&size=128`},
+        logoUrl(s){if(!s)return'';return`https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://${this._logoDomain(s)}&size=128`},
+        logoFallback(s){if(!s)return'';return`https://icons.duckduckgo.com/ip3/${this._logoDomain(s)}.ico`},
         scoreColor(v){return v>=7?'#10b981':v>=5?'#f59e0b':'#ef4444'},
         fmtP(v){if(!v&&v!==0)return'—';return'$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
         fmtBig(v){if(!v)return'—';const n=parseFloat(v);if(n>=1e12)return'$'+(n/1e12).toFixed(2)+'T';if(n>=1e9)return'$'+(n/1e9).toFixed(2)+'B';if(n>=1e6)return'$'+(n/1e6).toFixed(2)+'M';return'$'+n.toLocaleString()},
@@ -492,6 +500,7 @@ function app() {
 
         // ── Tables / TradingView ──
         initTvWidgets(){
+            if(typeof _loadTV==='function')_loadTV();
             const theme=this.darkMode?'dark':'light';
             const chartEl=document.getElementById('tv-advanced-chart');
             if(chartEl){

@@ -6,7 +6,6 @@
     <title>InvestorHub</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://logo.clearbit.com">
     <link rel="preconnect" href="https://t2.gstatic.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,7 +13,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script defer src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <script defer src="https://s3.tradingview.com/tv.js"></script>
+    <script>window._loadTV=function(){if(window._tvLoaded)return;window._tvLoaded=true;var s=document.createElement('script');s.src='https://s3.tradingview.com/tv.js';document.head.appendChild(s)}</script>
     <script>
         // Apply theme immediately to prevent flash
         (function(){
@@ -125,37 +124,90 @@
 <body class="bg-page fg-1 min-h-screen" x-data="app()" x-init="init()">
 
 <!-- ─── AUTH GATE (full-page login/register) ─── -->
-<div x-show="!authToken" x-cloak class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-sm">
-        <div class="text-center mb-8">
-            <div class="w-14 h-14 bg-gradient-to-br from-brand-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/25">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+<div x-show="!authToken" x-cloak class="min-h-screen flex items-center justify-center p-4 md:p-8">
+    <div class="w-full max-w-4xl flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+        <!-- Left: Branding & Features -->
+        <div class="flex-1 text-center md:text-left max-w-md">
+            <div class="flex items-center gap-3 justify-center md:justify-start mb-6">
+                <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/25">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold fg-0 tracking-tight">InvestorHub</h1>
+                </div>
             </div>
-            <h1 class="text-2xl font-bold fg-0">InvestorHub</h1>
-            <p class="text-sm fg-3 mt-1">Analytics Platform</p>
+            <h2 class="text-xl md:text-2xl font-bold fg-0 mb-3 leading-tight">Your AI-powered<br>investment research desk</h2>
+            <p class="text-sm fg-2 mb-6 leading-relaxed">Free, open-source stock analytics with institutional-grade tools. No paywall, no upsells — just deep analysis.</p>
+
+            <!-- Backend status indicator -->
+            <div x-show="backendWaking" class="mb-5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2.5">
+                <div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#f59e0b"></div>
+                <span class="text-xs text-amber-400 font-medium">Waking up the server (free tier) — takes ~20s on first visit...</span>
+            </div>
+            <div x-show="!backendWaking && !connectionError" x-cloak class="mb-5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2.5">
+                <div class="dot-pulse"></div>
+                <span class="text-xs text-emerald-400 font-medium">Server ready</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 text-left">
+                <div class="bg-inset rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                        <span class="text-[11px] font-bold fg-0">TA Chatbot</span>
+                    </div>
+                    <p class="text-[10px] fg-3 leading-snug">NYIF-trained AI teaches technical analysis concepts with real examples</p>
+                </div>
+                <div class="bg-inset rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span class="text-[11px] font-bold fg-0">Stock Scorer</span>
+                    </div>
+                    <p class="text-[10px] fg-3 leading-snug">5-factor health score: profitability, growth, valuation, financial health, momentum</p>
+                </div>
+                <div class="bg-inset rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span class="text-[11px] font-bold fg-0">Portfolio Optimizer</span>
+                    </div>
+                    <p class="text-[10px] fg-3 leading-snug">Efficient frontier analysis with Monte Carlo simulation — find your optimal allocation</p>
+                </div>
+                <div class="bg-inset rounded-xl p-3">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span class="text-[11px] font-bold fg-0">SEC Filings</span>
+                    </div>
+                    <p class="text-[10px] fg-3 leading-snug">Direct EDGAR integration — 10-K, 10-Q, 8-K filings with one click</p>
+                </div>
+            </div>
+            <p class="text-[10px] fg-3 mt-4 hidden md:block">Also: sentiment analysis, earnings surprise tracker, dividends calendar, AI portfolio review, stock comparison with radar charts, full financials with interactive tables, and more.</p>
         </div>
-        <!-- Login Form -->
-        <div x-show="authPage==='login'" class="card p-6 fade">
-            <h2 class="text-base font-bold fg-0 text-center mb-5">Welcome Back</h2>
-            <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-            <div class="space-y-3">
-                <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+
+        <!-- Right: Auth Forms -->
+        <div class="w-full max-w-sm flex-shrink-0">
+            <!-- Login Form -->
+            <div x-show="authPage==='login'" class="card p-6 fade">
+                <h2 class="text-base font-bold fg-0 text-center mb-5">Welcome Back</h2>
+                <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+                <div class="space-y-3">
+                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                </div>
+                <button @click="login()" :disabled="authLoading||backendWaking" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':backendWaking?'Waiting for server...':'Sign In'"></button>
+                <div class="text-center mt-4"><span class="text-[12px] fg-3">Don't have an account?</span> <button @click="authError='';authPage='register'" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
             </div>
-            <button @click="login()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':'Sign In'"></button>
-            <div class="text-center mt-4"><span class="text-[12px] fg-3">Don't have an account?</span> <button @click="authError='';authPage='register'" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
-        </div>
-        <!-- Register Form -->
-        <div x-show="authPage==='register'" class="card p-6 fade">
-            <h2 class="text-base font-bold fg-0 text-center mb-5">Create Account</h2>
-            <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-            <div class="space-y-3">
-                <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+            <!-- Register Form -->
+            <div x-show="authPage==='register'" class="card p-6 fade">
+                <h2 class="text-base font-bold fg-0 text-center mb-5">Create Account</h2>
+                <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
+                <div class="space-y-3">
+                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                </div>
+                <button @click="register()" :disabled="authLoading||backendWaking" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating account...':backendWaking?'Waiting for server...':'Create Account'"></button>
+                <div class="text-center mt-4"><span class="text-[12px] fg-3">Already have an account?</span> <button @click="authError='';authPage='login'" class="text-[12px] text-brand-400 font-medium">Sign in</button></div>
             </div>
-            <button @click="register()" :disabled="authLoading" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating...':'Create Account'"></button>
-            <div class="text-center mt-4"><span class="text-[12px] fg-3">Already have an account?</span> <button @click="authError='';authPage='login'" class="text-[12px] text-brand-400 font-medium">Sign in</button></div>
+            <p class="text-[10px] fg-3 text-center mt-3">Your portfolio and watchlist are saved to your account.</p>
         </div>
     </div>
 </div>
