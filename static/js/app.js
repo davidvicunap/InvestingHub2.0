@@ -32,7 +32,7 @@ function app() {
             {id:'news',label:'News',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>'},
             {id:'analysis',label:'Analysis',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>'},
             {id:'compare',label:'Compare',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>'},
-            {id:'tables',label:'Tables',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>'},
+
             {id:'portfolio',label:'Portfolio',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>'},
             {id:'calendar',label:'Calendar',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'},
         ],
@@ -59,7 +59,6 @@ function app() {
             {key:'momentum',label:'Momentum',desc:'Price Trends',weight:15},
         ],
 
-        tvWidget:null, tvScreener:null,
         chatOpen:false, chatMessages:[], chatInput:'', chatLoading:false,
 
         calendarEvents:[], calendarLoading:false, calendarFilter:'all',
@@ -85,7 +84,6 @@ function app() {
 
         watchlistDigest:null, watchlistDigestLoading:false, showWatchlistDigest:false,
         peerData:null, peerLoading:false,
-        optimizerResult:null, optimizerLoading:false, showOptimizer:false,
         earningsHistory:null, earningsHistoryLoading:false, earningsHistorySymbol:'',
 
         apex:{}, tv:{},
@@ -151,10 +149,10 @@ function app() {
         toggleTheme(){this.darkMode=!this.darkMode;this.applyTheme();localStorage.setItem('investorhub-theme',this.darkMode?'dark':'light');this.reRender()},
         applyTheme(){document.documentElement.classList.toggle('dark',this.darkMode)},
         tc(){return this.darkMode?{bg:'#0f1729',grid:'#1e293b',text:'#94a3b8',cross:'#475569',border:'#334155',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e2e8f0',am:'dark',ag:'#1e293b',at:'#94a3b8'}:{bg:'#fff',grid:'#f1f5f9',text:'#64748b',cross:'#94a3b8',border:'#e2e8f0',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#334155',am:'light',ag:'#f1f5f9',at:'#64748b'}},
-        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.portfolio.length)this.renderPortCharts();if(this.currentPage==='tables')this.$nextTick(()=>this.initTvWidgets());if(this.optimizerResult)this.$nextTick(()=>{this.renderEfficientFrontier();this.renderOptimalWeights()});if(this.earningsHistory)this.$nextTick(()=>this.renderEarningsChart())},
+        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.portfolio.length)this.renderPortCharts();if(this.earningsHistory)this.$nextTick(()=>this.renderEarningsChart())},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='tables')this.$nextTick(()=>this.initTvWidgets());if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()});if(p==='calendar')this.loadCalendar()},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()});if(p==='calendar')this.loadCalendar()},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
         switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol);if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
@@ -406,26 +404,6 @@ function app() {
             this.peerLoading=false;
         },
 
-        // ── Portfolio Optimizer ──
-        async runOptimizer(){
-            if(!this.portfolio.length||this.optimizerLoading)return;
-            this.optimizerLoading=true;this.showOptimizer=true;this.optimizerResult=null;
-            const syms=[...new Set(this.portfolio.map(h=>h.symbol))];
-            if(syms.length<2){this.optimizerResult={error:'Need at least 2 different stocks to optimize.'};this.optimizerLoading=false;return}
-            try{const r=await this.post('/api/portfolio/optimize',{symbols:syms});if(r.error){this.optimizerResult={error:r.error}}else{this.optimizerResult=r;this.$nextTick(()=>{this.renderEfficientFrontier();this.renderOptimalWeights()})}}catch(e){this.optimizerResult={error:'Connection error.'}}
-            this.optimizerLoading=false;
-        },
-        renderEfficientFrontier(){
-            if(!this.optimizerResult||this.optimizerResult.error)return;const c=this.tc(),d=this.optimizerResult;
-            const pts=d.frontier.map(p=>([p.risk,p.return]));
-            this.renderApex('opt-frontier',{chart:{type:'scatter',height:320,background:'transparent',toolbar:{show:false},zoom:{enabled:false}},series:[{name:'Portfolios',data:pts},{name:'Optimal',data:[[d.optimal.risk,d.optimal.return]]},{name:'Min Vol',data:[[d.minVol.risk,d.minVol.return]]}],xaxis:{title:{text:'Risk (Annual Vol %)',style:{color:c.at,fontSize:'11px'}},labels:{style:{colors:c.at},formatter:v=>v.toFixed(1)+'%'},tickAmount:6},yaxis:{title:{text:'Return (%)',style:{color:c.at,fontSize:'11px'}},labels:{style:{colors:c.at},formatter:v=>v.toFixed(1)+'%'}},colors:['rgba(99,102,241,.25)','#10b981','#f59e0b'],markers:{size:[3,12,12],strokeWidth:[0,2,2],strokeColors:['transparent','#fff','#fff']},legend:{labels:{colors:c.at},position:'top'},theme:{mode:c.am},grid:{borderColor:c.ag,strokeDashArray:3},tooltip:{theme:c.am,custom:({seriesIndex,dataPointIndex,w})=>{const p=w.config.series[seriesIndex].data[dataPointIndex];return`<div class="px-3 py-2 text-xs"><b>${w.config.series[seriesIndex].name}</b><br>Risk: ${p[0].toFixed(1)}% | Return: ${p[1].toFixed(1)}%</div>`}}});
-        },
-        renderOptimalWeights(){
-            if(!this.optimizerResult||this.optimizerResult.error)return;const c=this.tc(),d=this.optimizerResult;
-            const syms=Object.keys(d.optimal.weights),wts=syms.map(s=>Math.round(d.optimal.weights[s]*1000)/10);
-            this.renderApex('opt-weights',{chart:{type:'donut',height:260,background:'transparent'},series:wts,labels:syms,colors:['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#f97316','#ec4899'],theme:{mode:c.am},plotOptions:{pie:{donut:{size:'60%',labels:{show:true,name:{color:c.at},value:{color:c.at,formatter:v=>v.toFixed(1)+'%'},total:{show:true,label:'Sharpe',color:c.at,formatter:()=>d.optimal.sharpe.toFixed(2)}}}}},legend:{position:'bottom',labels:{colors:c.at}},stroke:{colors:[c.bg]},dataLabels:{enabled:false},tooltip:{theme:c.am,y:{formatter:v=>v.toFixed(1)+'%'}}});
-        },
-
         // ── Earnings Surprise Tracker ──
         async loadEarningsHistory(s){
             if(!s)return;this.earningsHistoryLoading=true;this.earningsHistorySymbol=s;this.earningsHistory=null;
@@ -497,46 +475,6 @@ function app() {
 
         // ── Apex ──
         renderApex(id,opts){if(typeof ApexCharts==='undefined')return;if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
-
-        // ── Tables / TradingView ──
-        initTvWidgets(){
-            if(typeof _loadTV==='function')_loadTV();
-            const theme=this.darkMode?'dark':'light';
-            const chartEl=document.getElementById('tv-advanced-chart');
-            if(chartEl){
-                chartEl.innerHTML='';
-                if(typeof TradingView!=='undefined'){
-                    this.tvWidget=new TradingView.widget({
-                        autosize:true,symbol:'NASDAQ:AAPL',interval:'D',timezone:'America/New_York',
-                        theme:theme,style:'1',locale:'en',
-                        enable_publishing:false,allow_symbol_change:true,
-                        details:true,hotlist:true,calendar:true,
-                        studies:['MASimple@tv-basicstudies','RSI@tv-basicstudies','MACD@tv-basicstudies'],
-                        container_id:'tv-advanced-chart',
-                        hide_side_toolbar:false,
-                        withdateranges:true,
-                        save_image:true,
-                    });
-                }
-            }
-            const scrEl=document.getElementById('tv-screener');
-            if(scrEl){
-                scrEl.innerHTML='';
-                const s=document.createElement('script');
-                s.type='text/javascript';
-                s.src='https://s3.tradingview.com/external-embedding/embed-widget-screener.js';
-                s.async=true;
-                s.textContent=JSON.stringify({
-                    width:'100%',height:500,defaultColumn:'overview',
-                    defaultScreen:'most_capitalized',market:'america',
-                    showToolbar:true,colorTheme:theme,locale:'en',
-                });
-                const wrap=document.createElement('div');
-                wrap.className='tradingview-widget-container__widget';
-                scrEl.appendChild(wrap);
-                scrEl.appendChild(s);
-            }
-        },
 
         // ── Calendar ──
         async loadCalendar(){this.calendarLoading=true;try{const d=await this.api('/api/earnings-calendar');this.calendarEvents=d.events||[]}catch(e){this.calendarEvents=[]}this.calendarLoading=false},

@@ -1,6 +1,10 @@
 import json
+import logging
 import sqlite3
 import os
+import urllib.parse
+import urllib.request
+from collections import OrderedDict
 from datetime import datetime, timedelta
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
@@ -14,10 +18,26 @@ import bcrypt
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import requests as http_requests
 
+log = logging.getLogger(__name__)
+
 app = Flask(__name__)
-CORS(app)
+
+_allowed_origins = [
+    "https://davidvicunap.github.io",
+    "http://localhost:5000",
+    "http://localhost:8050",
+    "http://127.0.0.1:5000",
+    "http://127.0.0.1:8050",
+]
+CORS(app, origins=_allowed_origins)
+
 app.config["DATABASE"] = os.environ.get("DATABASE_PATH", os.path.join(app.root_path, "portfolio.db"))
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "investorhub-dev-secret-key-change-in-prod")
+
+_secret = os.environ.get("SECRET_KEY", "")
+if not _secret and not os.environ.get("FLASK_DEBUG"):
+    _secret = "investorhub-dev-key-local-only"
+    log.warning("SECRET_KEY not set — using insecure dev default. Set SECRET_KEY env var in production.")
+app.config["SECRET_KEY"] = _secret
 
 sentiment_analyzer = SentimentIntensityAnalyzer()
 
@@ -119,20 +139,62 @@ def optional_auth(f):
     return decorated
 
 
-# -- Helper: cache yfinance Ticker objects (5-min TTL) -----------------------
+# -- LRU Cache with TTL -------------------------------------------------------
 
-_ticker_cache = {}
-_ticker_cache_time = {}
-_TICKER_TTL = 300
+class LRUCache:
+    """Thread-safe-ish LRU dict with per-entry TTL and a max size."""
+    def __init__(self, maxsize=200, default_ttl=300):
+        self._data = OrderedDict()
+        self._maxsize = maxsize
+        self._ttl = default_ttl
+
+    def get(self, key, ttl=None):
+        ttl = ttl or self._ttl
+        entry = self._data.get(key)
+        if entry is None:
+            return None
+        if (datetime.utcnow().timestamp() - entry[1]) > ttl:
+            self._data.pop(key, None)
+            return None
+        self._data.move_to_end(key)
+        return entry[0]
+
+    def put(self, key, value):
+        self._data[key] = (value, datetime.utcnow().timestamp())
+        self._data.move_to_end(key)
+        while len(self._data) > self._maxsize:
+            self._data.popitem(last=False)
+
+    def clear(self):
+        self._data.clear()
+
+
+# -- Helper: cache yfinance Ticker objects + info (5-min TTL) ----------------
+
+_ticker_cache = LRUCache(maxsize=200, default_ttl=300)
+_info_cache = LRUCache(maxsize=200, default_ttl=300)
 
 
 def get_ticker(symbol: str) -> yf.Ticker:
     s = symbol.upper().strip()
-    now = datetime.utcnow().timestamp()
-    if s not in _ticker_cache or (now - _ticker_cache_time.get(s, 0)) > _TICKER_TTL:
-        _ticker_cache[s] = yf.Ticker(s)
-        _ticker_cache_time[s] = now
-    return _ticker_cache[s]
+    cached = _ticker_cache.get(s)
+    if cached:
+        return cached
+    t = yf.Ticker(s)
+    _ticker_cache.put(s, t)
+    return t
+
+
+def get_info(symbol: str) -> dict:
+    """Get ticker .info with caching. This is the main perf win."""
+    s = symbol.upper().strip()
+    cached = _info_cache.get(s)
+    if cached is not None:
+        return cached
+    t = get_ticker(s)
+    info = t.info
+    _info_cache.put(s, info)
+    return info
 
 
 def safe_get(d, key, default=None):
@@ -149,8 +211,7 @@ def safe_get(d, key, default=None):
 
 # -- Response Cache -----------------------------------------------------------
 
-_resp_cache = {}
-_resp_cache_time = {}
+_resp_cache = LRUCache(maxsize=300, default_ttl=60)
 
 
 def cache_response(ttl):
@@ -158,15 +219,14 @@ def cache_response(ttl):
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            key = request.full_path
-            now = datetime.utcnow().timestamp()
-            if key in _resp_cache and (now - _resp_cache_time.get(key, 0)) < ttl:
-                return _resp_cache[key]
+            key = request.full_path.rstrip("?")
+            cached = _resp_cache.get(key, ttl=ttl)
+            if cached is not None:
+                return cached
             result = f(*args, **kwargs)
             status = result[1] if isinstance(result, tuple) else 200
             if 200 <= status < 300:
-                _resp_cache[key] = result
-                _resp_cache_time[key] = now
+                _resp_cache.put(key, result)
             return result
         return wrapper
     return decorator
@@ -256,8 +316,8 @@ def api_search():
     if len(q) < 1:
         return jsonify([])
     try:
-        import urllib.request
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={q}&quotesCount=8&newsCount=0"
+        encoded_q = urllib.parse.quote(q, safe="")
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={encoded_q}&quotesCount=8&newsCount=0"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode())
@@ -271,8 +331,8 @@ def api_search():
                     "exchange": item.get("exchange", ""),
                 })
         return jsonify(results)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Search failed"}), 500
 
 
 # -- API: Quote ---------------------------------------------------------------
@@ -281,8 +341,7 @@ def api_search():
 @cache_response(30)
 def api_quote(symbol):
     try:
-        t = get_ticker(symbol)
-        info = t.info
+        info = get_info(symbol)
         quote = {
             "symbol": symbol.upper(),
             "name": safe_get(info, "longName") or safe_get(info, "shortName", symbol),
@@ -344,7 +403,8 @@ def api_quote(symbol):
         quote["changePercent"] = round((price - prev) / prev * 100, 2) if prev else 0
         return jsonify(quote)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        log.exception("Quote error for %s", symbol)
+        return jsonify({"error": "Failed to fetch quote"}), 500
 
 
 # -- API: Price History -------------------------------------------------------
@@ -359,21 +419,18 @@ def api_history(symbol):
         df = t.history(period=period, interval=interval)
         if df.empty:
             return jsonify({"error": "No data found"}), 404
-        records = []
-        for idx, row in df.iterrows():
-            ts = int(idx.timestamp() * 1000) if hasattr(idx, "timestamp") else 0
-            records.append({
-                "date": idx.strftime("%Y-%m-%d"),
-                "timestamp": ts,
-                "open": round(float(row["Open"]), 2),
-                "high": round(float(row["High"]), 2),
-                "low": round(float(row["Low"]), 2),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row["Volume"]),
-            })
+        df = df.reset_index()
+        df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
+        df["timestamp"] = (df["Date"].astype("int64") // 10**6).astype(int)
+        records = df.apply(lambda r: {
+            "date": r["date"], "timestamp": r["timestamp"],
+            "open": round(float(r["Open"]), 2), "high": round(float(r["High"]), 2),
+            "low": round(float(r["Low"]), 2), "close": round(float(r["Close"]), 2),
+            "volume": int(r["Volume"]),
+        }, axis=1).tolist()
         return jsonify(records)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Failed to fetch history"}), 500
 
 
 # -- API: Fundamentals --------------------------------------------------------
@@ -390,32 +447,35 @@ def api_fundamentals(symbol):
             result = {}
             for col in df.columns:
                 date_str = col.strftime("%Y-%m-%d") if hasattr(col, "strftime") else str(col)
-                result[date_str] = {}
+                col_data = {}
                 for idx in df.index:
                     val = df.loc[idx, col]
-                    if pd.notna(val):
-                        result[date_str][str(idx)] = float(val)
-                    else:
-                        result[date_str][str(idx)] = None
+                    col_data[str(idx)] = float(val) if pd.notna(val) else None
+                result[date_str] = col_data
             return result
 
-        financials = df_to_dict(t.financials)
-        quarterly_financials = df_to_dict(t.quarterly_financials)
-        balance_sheet = df_to_dict(t.balance_sheet)
-        quarterly_balance_sheet = df_to_dict(t.quarterly_balance_sheet)
-        cashflow = df_to_dict(t.cashflow)
-        quarterly_cashflow = df_to_dict(t.quarterly_cashflow)
+        attrs = ["financials", "quarterly_financials", "balance_sheet",
+                 "quarterly_balance_sheet", "cashflow", "quarterly_cashflow"]
+
+        def fetch_attr(attr):
+            try:
+                return attr, df_to_dict(getattr(t, attr))
+            except Exception:
+                return attr, {}
+
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            results = dict(executor.map(lambda a: fetch_attr(a), attrs))
 
         return jsonify({
-            "financials": financials,
-            "quarterlyFinancials": quarterly_financials,
-            "balanceSheet": balance_sheet,
-            "quarterlyBalanceSheet": quarterly_balance_sheet,
-            "cashflow": cashflow,
-            "quarterlyCashflow": quarterly_cashflow,
+            "financials": results["financials"],
+            "quarterlyFinancials": results["quarterly_financials"],
+            "balanceSheet": results["balance_sheet"],
+            "quarterlyBalanceSheet": results["quarterly_balance_sheet"],
+            "cashflow": results["cashflow"],
+            "quarterlyCashflow": results["quarterly_cashflow"],
         })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Failed to fetch fundamentals"}), 500
 
 
 # -- API: Market Overview -----------------------------------------------------
@@ -437,8 +497,7 @@ def api_market():
 
     def fetch_index(sym, name):
         try:
-            t = get_ticker(sym)
-            info = t.info
+            info = get_info(sym)
             price = safe_get(info, "regularMarketPrice") or safe_get(info, "currentPrice", 0)
             prev = safe_get(info, "previousClose") or safe_get(info, "regularMarketPreviousClose", 0)
             change = round(price - prev, 2) if price and prev else 0
@@ -467,8 +526,8 @@ def api_compare():
 
     def fetch_stock(sym):
         try:
+            info = get_info(sym)
             t = get_ticker(sym)
-            info = t.info
             df = t.history(period=period)
             prices = []
             if not df.empty:
@@ -500,7 +559,7 @@ def api_compare():
                 "prices": prices,
             }
         except Exception as e:
-            return sym, {"error": str(e)}
+            return sym, {"error": "Failed to fetch data"}
 
     with ThreadPoolExecutor(max_workers=min(len(symbols[:5]), 5)) as executor:
         futures = [executor.submit(fetch_stock, sym) for sym in symbols[:5]]
@@ -521,8 +580,7 @@ def api_portfolio_list():
 
     def enrich_holding(h):
         try:
-            t = get_ticker(h["symbol"])
-            info = t.info
+            info = get_info(h["symbol"])
             h["currentPrice"] = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
             h["name"] = safe_get(info, "longName") or safe_get(info, "shortName", h["symbol"])
         except Exception:
@@ -542,6 +600,13 @@ def api_portfolio_add():
     data = request.get_json()
     if not data or not data.get("symbol") or not data.get("shares") or not data.get("buy_price"):
         return jsonify({"error": "symbol, shares, and buy_price are required"}), 400
+    try:
+        shares = float(data["shares"])
+        buy_price = float(data["buy_price"])
+    except (ValueError, TypeError):
+        return jsonify({"error": "shares and buy_price must be numbers"}), 400
+    if shares <= 0 or buy_price <= 0:
+        return jsonify({"error": "shares and buy_price must be positive"}), 400
     db = get_db()
     user = g.current_user
     user_id = user["user_id"]
@@ -549,13 +614,13 @@ def api_portfolio_add():
     name = data.get("name", "")
     if not name:
         try:
-            info = get_ticker(symbol).info
+            info = get_info(symbol)
             name = safe_get(info, "longName") or safe_get(info, "shortName", symbol)
         except Exception:
             name = symbol
     cursor = db.execute(
         "INSERT INTO holdings (user_id, symbol, name, shares, buy_price, buy_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (user_id, symbol, name, float(data["shares"]), float(data["buy_price"]),
+        (user_id, symbol, name, shares, buy_price,
          data.get("buy_date", ""), data.get("notes", ""))
     )
     db.commit()
@@ -609,8 +674,7 @@ def api_watchlist_list():
 
     def enrich_watchlist_item(item):
         try:
-            t = get_ticker(item["symbol"])
-            info = t.info
+            info = get_info(item["symbol"])
             item["price"] = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
             prev = safe_get(info, "previousClose", 0)
             item["change"] = round(item["price"] - prev, 2) if item["price"] and prev else 0
@@ -638,7 +702,7 @@ def api_watchlist_add():
     name = data.get("name", "")
     if not name:
         try:
-            info = get_ticker(symbol).info
+            info = get_info(symbol)
             name = safe_get(info, "longName") or safe_get(info, "shortName", symbol)
         except Exception:
             name = symbol
@@ -647,7 +711,7 @@ def api_watchlist_add():
     user_id = user["user_id"]
     try:
         db.execute(
-            "INSERT OR REPLACE INTO watchlist (user_id, symbol, name) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO watchlist (user_id, symbol, name) VALUES (?, ?, ?)",
             (user_id, symbol, name)
         )
         db.commit()
@@ -692,8 +756,8 @@ def api_technicals(symbol):
         df["MACD_Hist"] = df["MACD"] - df["Signal"]
 
         delta = close.diff()
-        gain = delta.where(delta > 0, 0).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        gain = delta.where(delta > 0, 0).ewm(alpha=1/14, min_periods=14, adjust=False).mean()
+        loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, min_periods=14, adjust=False).mean()
         rs = gain / loss
         df["RSI"] = 100 - (100 / (1 + rs))
 
@@ -713,20 +777,19 @@ def api_technicals(symbol):
             records.append(r)
 
         return jsonify(records)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "Failed to fetch technicals"}), 500
 
 
 # -- News Fetcher (direct Yahoo Finance API) ----------------------------------
 
 def _fetch_yahoo_news(symbol, count=20):
     """Fetch news directly from Yahoo Finance API, bypassing yfinance .news property."""
-    import urllib.request
     results = []
 
-    # Method 1: Yahoo search API (news endpoint)
     try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={symbol}&quotesCount=0&newsCount={count}&enableFuzzyQuery=false"
+        encoded_sym = urllib.parse.quote(symbol, safe="")
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={encoded_sym}&quotesCount=0&newsCount={count}&enableFuzzyQuery=false"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
@@ -822,7 +885,7 @@ def api_news(symbol):
             "totalArticles": len(results),
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: Stock Health Score --------------------------------------------------
@@ -831,8 +894,7 @@ def api_news(symbol):
 @cache_response(300)
 def api_score(symbol):
     try:
-        t = get_ticker(symbol)
-        info = t.info
+        info = get_info(symbol)
 
         scores = {}
         total_weight = 0
@@ -1022,6 +1084,7 @@ def api_score(symbol):
         momentum_score = 0
         momentum_factors = 0
         try:
+            t = get_ticker(symbol)
             df = t.history(period="6mo")
             if not df.empty and len(df) > 20:
                 current = float(df["Close"].iloc[-1])
@@ -1091,7 +1154,7 @@ def api_score(symbol):
             }
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: SEC Filings ---------------------------------------------------------
@@ -1103,7 +1166,6 @@ _SEC_TICKERS_TTL = 86400
 
 def _get_sec_cik(symbol):
     global _sec_tickers_cache, _sec_tickers_cache_time
-    import urllib.request
     now = datetime.utcnow().timestamp()
     if not _sec_tickers_cache or (now - _sec_tickers_cache_time) > _SEC_TICKERS_TTL:
         url = "https://www.sec.gov/files/company_tickers.json"
@@ -1129,7 +1191,6 @@ def _get_sec_cik(symbol):
 @app.route("/api/sec-filings/<symbol>")
 @cache_response(120)
 def api_sec_filings(symbol):
-    import urllib.request
     symbol = symbol.upper().strip()
     try:
         company = _get_sec_cik(symbol)
@@ -1180,7 +1241,7 @@ def api_sec_filings(symbol):
             "edgarUrl": f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=&dateb=&owner=include&count=40&search_text=&action=getcompany",
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: Market News (General) -----------------------------------------------
@@ -1215,7 +1276,7 @@ def api_market_news():
         all_news.sort(key=lambda x: x.get("publishedAt", 0), reverse=True)
         return jsonify({"news": all_news[:30]})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: AI Chat (Technical Analysis Teacher) --------------------------------
@@ -1250,8 +1311,8 @@ def _call_openrouter(messages, max_tokens=1200, temperature=0.6):
             return None, (error_msg, resp.status_code)
         reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
         return reply, None
-    except Exception as e:
-        return None, (str(e), 500)
+    except Exception:
+        return None, ("Chat request failed", 500)
 
 TA_SYSTEM_PROMPT = """You are a Technical Analysis (TA) expert and teacher, trained in the style of the New York Institute of Finance curriculum. Your role is to educate users about technical analysis clearly and concisely.
 
@@ -1513,7 +1574,7 @@ def api_earnings_calendar():
 
             # Dividend info
             try:
-                info = t.info
+                info = get_info(sym)
                 ex_div = safe_get(info, "exDividendDate")
                 if ex_div:
                     if isinstance(ex_div, (int, float)):
@@ -1566,7 +1627,7 @@ def api_dividends(symbol):
     """Returns dividend details and payment history for a symbol."""
     try:
         t = get_ticker(symbol.upper())
-        info = t.info
+        info = get_info(symbol.upper())
         result = {
             "symbol": symbol.upper(),
             "dividendRate": safe_get(info, "dividendRate", 0),
@@ -1597,7 +1658,7 @@ def api_dividends(symbol):
 
         return jsonify(result)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: AI Watchlist Digest -------------------------------------------------
@@ -1640,8 +1701,7 @@ def api_chat_watchlist_digest():
 @cache_response(300)
 def api_peers(symbol):
     try:
-        t = get_ticker(symbol.upper())
-        info = t.info
+        info = get_info(symbol.upper())
         sector = safe_get(info, "sector", "")
         industry = safe_get(info, "industry", "")
         if not sector:
@@ -1669,8 +1729,7 @@ def api_peers(symbol):
 
         def fetch_peer(sym):
             try:
-                pt = get_ticker(sym)
-                pi = pt.info
+                pi = get_info(sym)
                 return {
                     "symbol": sym,
                     "name": safe_get(pi, "longName") or safe_get(pi, "shortName", sym),
@@ -1700,96 +1759,7 @@ def api_peers(symbol):
             "peers": peers,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# -- API: Portfolio Optimizer --------------------------------------------------
-
-@app.route("/api/portfolio/optimize", methods=["POST"])
-@require_auth
-def api_portfolio_optimize():
-    data = request.get_json()
-    symbols = data.get("symbols", [])
-    if not symbols or len(symbols) < 2:
-        return jsonify({"error": "At least 2 symbols required"}), 400
-
-    try:
-        prices = {}
-        for sym in symbols[:10]:
-            t = get_ticker(sym)
-            df = t.history(period="1y")
-            if not df.empty:
-                prices[sym] = df["Close"]
-
-        if len(prices) < 2:
-            return jsonify({"error": "Insufficient price data"}), 400
-
-        price_df = pd.DataFrame(prices).dropna()
-        if len(price_df) < 30:
-            return jsonify({"error": "Insufficient history"}), 400
-
-        returns = price_df.pct_change().dropna()
-        mean_returns = returns.mean() * 252
-        cov_matrix = returns.cov() * 252
-        n = len(prices)
-        risk_free = 0.05
-
-        num_portfolios = 3000
-        results = np.zeros((3, num_portfolios))
-        weights_record = []
-
-        for i in range(num_portfolios):
-            w = np.random.random(n)
-            w /= w.sum()
-            p_ret = np.dot(w, mean_returns)
-            p_vol = np.sqrt(np.dot(w.T, np.dot(cov_matrix, w)))
-            sharpe = (p_ret - risk_free) / p_vol if p_vol > 0 else 0
-            results[0, i] = p_vol
-            results[1, i] = p_ret
-            results[2, i] = sharpe
-            weights_record.append(w)
-
-        max_sharpe_idx = results[2].argmax()
-        min_vol_idx = results[0].argmin()
-
-        optimal_weights = weights_record[max_sharpe_idx]
-        min_vol_weights = weights_record[min_vol_idx]
-
-        frontier = []
-        for i in range(num_portfolios):
-            frontier.append({
-                "risk": round(float(results[0, i]) * 100, 2),
-                "return": round(float(results[1, i]) * 100, 2),
-                "sharpe": round(float(results[2, i]), 3),
-            })
-
-        frontier.sort(key=lambda x: x["risk"])
-        step = max(1, len(frontier) // 200)
-        frontier = frontier[::step]
-
-        return jsonify({
-            "symbols": list(prices.keys()),
-            "optimal": {
-                "weights": {sym: round(float(w), 4) for sym, w in zip(prices.keys(), optimal_weights)},
-                "return": round(float(results[1, max_sharpe_idx]) * 100, 2),
-                "risk": round(float(results[0, max_sharpe_idx]) * 100, 2),
-                "sharpe": round(float(results[2, max_sharpe_idx]), 3),
-            },
-            "minVol": {
-                "weights": {sym: round(float(w), 4) for sym, w in zip(prices.keys(), min_vol_weights)},
-                "return": round(float(results[1, min_vol_idx]) * 100, 2),
-                "risk": round(float(results[0, min_vol_idx]) * 100, 2),
-                "sharpe": round(float(results[2, min_vol_idx]), 3),
-            },
-            "frontier": frontier,
-            "annualReturns": {sym: round(float(v) * 100, 2) for sym, v in mean_returns.items()},
-            "correlation": {
-                sym: {s2: round(float(v), 3) for s2, v in row.items()}
-                for sym, row in returns.corr().iterrows()
-            },
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: Earnings History (Surprise Tracker) ----------------------------------
@@ -1824,7 +1794,7 @@ def api_earnings_history(symbol):
             "history": history,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Server error"}), 500
 
 
 # -- API: Streaming AI Chat ---------------------------------------------------
@@ -1885,7 +1855,7 @@ def api_chat_stream():
                     except json.JSONDecodeError:
                         continue
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': 'Stream error'})}\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -1896,7 +1866,8 @@ def api_chat_stream():
 
 # -- Run ----------------------------------------------------------------------
 
-init_db()
+with app.app_context():
+    init_db()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
