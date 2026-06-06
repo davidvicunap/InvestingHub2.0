@@ -77,16 +77,26 @@ function app() {
 
         init() {
             this.applyTheme();
-            this._warmBackend();
-            if(this.authToken){
-                this.loadMarketData(); this.loadWatchlist(); this.loadPortfolio();
-            }
+            this._warmBackend();   // loads initial data once the backend responds
             this._waitForLibs();
         },
         async _warmBackend(){
-            this.backendWaking=true;
-            try{await fetch(API_BASE+'/',{signal:AbortSignal.timeout(45000)});this.connectionError=false}catch(e){this.connectionError=true}
-            this.backendWaking=false;
+            // Poll the health endpoint until the backend is up (free-tier cold
+            // starts can take 1-3 min). Auto-connects without a manual retry.
+            this.backendWaking=true; this.connectionError=false;
+            const deadline=Date.now()+240000; let attempt=0;
+            while(Date.now()<deadline){
+                try{
+                    await fetch(API_BASE+'/',{signal:AbortSignal.timeout(10000)});
+                    this.connectionError=false; this.backendWaking=false;
+                    if(this.authToken){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}
+                    return;
+                }catch(e){
+                    attempt++;
+                    await new Promise(r=>setTimeout(r,Math.min(3000,400*attempt)));
+                }
+            }
+            this.backendWaking=false; this.connectionError=true;
         },
         _chartsReady:false,
         _waitForLibs(){

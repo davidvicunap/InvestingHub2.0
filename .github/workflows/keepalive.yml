@@ -1,0 +1,24 @@
+name: Keep backend awake
+
+# Render's free tier spins the service down after ~15 min of inactivity,
+# which causes a 1-3 min cold start on the next visit. Pinging the health
+# endpoint on a schedule keeps the instance warm so users never wait.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes
+  workflow_dispatch: {}        # allow manual runs
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 https://investinghub.onrender.com/ || true)
+            echo "Attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "Health check did not return 200 after retries (cold start may still be in progress)."

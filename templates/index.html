@@ -141,7 +141,7 @@
             <!-- Backend status indicator -->
             <div x-show="backendWaking" class="mb-5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2.5">
                 <div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#f59e0b"></div>
-                <span class="text-xs text-amber-400 font-medium">Waking up the server (free tier) — takes ~20s on first visit...</span>
+                <span class="text-xs text-amber-400 font-medium">Connecting to the server — this can take up to a minute on the first visit...</span>
             </div>
             <div x-show="!backendWaking && !connectionError" x-cloak class="mb-5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2.5">
                 <div class="dot-pulse"></div>
