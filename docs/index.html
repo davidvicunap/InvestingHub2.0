@@ -326,6 +326,41 @@
                 </template>
             </div>
         </div>
+        <!-- Market Movers -->
+        <div class="mb-8" x-show="movers.gainers.length||movers.losers.length" x-cloak>
+            <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-3">Market Movers <span class="fg-3 normal-case tracking-normal">· large caps today</span></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div class="card p-5">
+                    <div class="flex items-center gap-2 mb-3"><svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><span class="text-[12px] font-semibold fg-0">Top Gainers</span></div>
+                    <div class="space-y-px">
+                        <template x-for="m in movers.gainers" :key="'g'+m.symbol">
+                            <div class="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-[var(--bg-2)] cursor-pointer transition" @click="selectStock(m.symbol)">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(m.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(m.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="m.symbol.charAt(0)"></span></div>
+                                    <span class="text-[13px] font-semibold fg-0" x-text="m.symbol"></span>
+                                </div>
+                                <div class="flex items-center gap-3"><span class="text-[13px] fg-1 tabular-nums" x-text="fmtP(m.price)"></span><span class="text-[12px] font-bold text-emerald-500 tabular-nums w-16 text-right">+<span x-text="m.changePercent.toFixed(2)"></span>%</span></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="card p-5">
+                    <div class="flex items-center gap-2 mb-3"><svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg><span class="text-[12px] font-semibold fg-0">Top Losers</span></div>
+                    <div class="space-y-px">
+                        <template x-for="m in movers.losers" :key="'l'+m.symbol">
+                            <div class="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-[var(--bg-2)] cursor-pointer transition" @click="selectStock(m.symbol)">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(m.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(m.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="m.symbol.charAt(0)"></span></div>
+                                    <span class="text-[13px] font-semibold fg-0" x-text="m.symbol"></span>
+                                </div>
+                                <div class="flex items-center gap-3"><span class="text-[13px] fg-1 tabular-nums" x-text="fmtP(m.price)"></span><span class="text-[12px] font-bold text-red-500 tabular-nums w-16 text-right"><span x-text="m.changePercent.toFixed(2)"></span>%</span></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Watchlist + Portfolio -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <!-- Watchlist -->
@@ -531,6 +566,136 @@
             <!-- Tabs -->
             <div class="pill-bar mb-4 overflow-x-auto"><template x-for="t in analysisTabs" :key="t"><button @click="switchTab(t)" :class="analysisTab===t?'on':''" class="pill" x-text="t"></button></template></div>
 
+            <!-- ───── OVERVIEW ───── -->
+            <div x-show="analysisTab==='Overview'" class="space-y-4 fade">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Fair Value -->
+                    <div class="card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                                <span class="text-[13px] font-semibold fg-0">Fair Value Estimate</span>
+                            </div>
+                            <span x-show="valuationData?.verdict&&valuationData?.verdict!=='—'" class="text-[11px] px-2.5 py-1 rounded-lg font-bold" :class="valuationData?.upside>12?'bg-emerald-500/15 text-emerald-400':valuationData?.upside<-12?'bg-red-500/15 text-red-400':'bg-amber-500/15 text-amber-400'" x-text="valuationData?.verdict"></span>
+                        </div>
+                        <div x-show="!valuationData" class="space-y-2"><div class="skel h-12"></div><div class="skel h-24"></div></div>
+                        <div x-show="valuationData" x-cloak>
+                            <template x-if="valuationData?.fairValue">
+                                <div>
+                                    <div class="grid grid-cols-2 gap-3 mb-4">
+                                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 uppercase font-semibold">Current Price</div><div class="text-xl font-extrabold fg-0 mt-0.5 tabular-nums" x-text="fmtP(valuationData?.price)"></div></div>
+                                        <div class="bg-inset rounded-xl p-3"><div class="text-[10px] fg-3 uppercase font-semibold">Fair Value</div><div class="text-xl font-extrabold mt-0.5 tabular-nums" :class="valuationData?.upside>=0?'text-emerald-500':'text-red-500'" x-text="fmtP(valuationData?.fairValue)"></div><div class="text-[11px] font-bold tabular-nums" :class="valuationData?.upside>=0?'text-emerald-500':'text-red-500'"><span x-text="valuationData?.upside>=0?'▲ ':'▼ '"></span><span x-text="Math.abs(valuationData?.upside||0).toFixed(1)"></span>% <span x-text="valuationData?.upside>=0?'upside':'downside'"></span></div></div>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <div class="text-[10px] fg-3 font-bold uppercase tracking-widest mb-1">Methods</div>
+                                        <template x-for="m in valuationData?.methods||[]" :key="m.method">
+                                            <div class="flex items-center justify-between text-[12px] py-0.5">
+                                                <div class="min-w-0"><span class="fg-1 font-medium" x-text="m.method"></span><span class="fg-3 ml-1.5 text-[10px]" x-text="m.detail"></span></div>
+                                                <span class="fg-0 font-semibold tabular-nums flex-shrink-0 ml-2" x-text="fmtP(m.fairValue)"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="valuationData&&!valuationData.fairValue"><p class="text-[12px] fg-3 py-3 text-center">Not enough data for a fair-value estimate.</p></template>
+                            <div class="grid grid-cols-4 gap-2 mt-4 pt-4" style="border-top:1px solid var(--border-s)">
+                                <div><div class="text-[9px] fg-3 uppercase font-semibold">P/E</div><div class="text-[13px] font-bold fg-0 tabular-nums mt-0.5" x-text="valuationData?.currentPE?valuationData.currentPE.toFixed(1):'—'"></div></div>
+                                <div><div class="text-[9px] fg-3 uppercase font-semibold">Fwd P/E</div><div class="text-[13px] font-bold fg-0 tabular-nums mt-0.5" x-text="valuationData?.forwardPE?valuationData.forwardPE.toFixed(1):'—'"></div></div>
+                                <div><div class="text-[9px] fg-3 uppercase font-semibold">PEG</div><div class="text-[13px] font-bold fg-0 tabular-nums mt-0.5" x-text="valuationData?.pegRatio?valuationData.pegRatio.toFixed(2):'—'"></div></div>
+                                <div><div class="text-[9px] fg-3 uppercase font-semibold">P/B</div><div class="text-[13px] font-bold fg-0 tabular-nums mt-0.5" x-text="valuationData?.priceToBook?valuationData.priceToBook.toFixed(1):'—'"></div></div>
+                            </div>
+                            <p class="text-[9px] fg-3 mt-3 leading-snug">Estimates blend analyst targets, an earnings-growth multiple and a DCF. For research only — not investment advice.</p>
+                        </div>
+                    </div>
+                    <!-- Analyst Consensus -->
+                    <div class="card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <span class="text-[13px] font-semibold fg-0">Analyst Consensus</span>
+                            </div>
+                            <span x-show="analystData?.numberOfAnalysts" class="text-[10px] fg-3" x-text="(analystData?.numberOfAnalysts||0)+' analysts'"></span>
+                        </div>
+                        <div x-show="!analystData" class="space-y-2"><div class="skel h-12"></div><div class="skel h-24"></div></div>
+                        <div x-show="analystData" x-cloak>
+                            <template x-if="analystData?.targetMean">
+                                <div>
+                                    <div class="flex items-end gap-3 mb-3">
+                                        <div><div class="text-[10px] fg-3 uppercase font-semibold">Mean Target</div><div class="text-2xl font-extrabold fg-0 tabular-nums" x-text="fmtP(analystData?.targetMean)"></div></div>
+                                        <div class="pb-1" x-show="analystData?.upside!=null"><span :class="analystData?.upside>=0?'text-emerald-500':'text-red-500'" class="text-[13px] font-bold tabular-nums"><span x-text="analystData?.upside>=0?'▲ ':'▼ '"></span><span x-text="Math.abs(analystData?.upside||0).toFixed(1)"></span>%</span></div>
+                                    </div>
+                                    <div x-show="analystData?.targetLow&&analystData?.targetHigh" class="mb-4">
+                                        <div class="relative h-2 rounded-full bg-inset my-3">
+                                            <div class="absolute top-0 bottom-0 left-0 right-0 rounded-full" style="background:linear-gradient(90deg,rgba(248,113,113,.35),rgba(245,158,11,.35),rgba(16,185,129,.35))"></div>
+                                            <div class="absolute -top-1 w-1 h-4 bg-[var(--fg-0)] rounded" :style="'left:calc('+rangePct(analystData?.price,analystData?.targetLow,analystData?.targetHigh)+'% - 2px)'" title="Current price"></div>
+                                        </div>
+                                        <div class="flex justify-between text-[10px] fg-3"><span x-text="fmtP(analystData?.targetLow)"></span><span class="fg-2">price vs target range</span><span x-text="fmtP(analystData?.targetHigh)"></span></div>
+                                    </div>
+                                    <template x-if="analystData?.distribution">
+                                        <div class="space-y-1.5">
+                                            <template x-for="r in ratingRows()" :key="r.key">
+                                                <div x-show="r.count>0" class="flex items-center gap-2">
+                                                    <span class="text-[11px] fg-2 w-20 flex-shrink-0" x-text="r.label"></span>
+                                                    <div class="flex-1 score-bar"><div class="fill" :style="'width:'+(analystDistTotal()?r.count/analystDistTotal()*100:0)+'%;background:'+r.color"></div></div>
+                                                    <span class="text-[11px] fg-1 font-semibold w-5 text-right tabular-nums" x-text="r.count"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+                            <template x-if="analystData&&!analystData.targetMean"><p class="text-[12px] fg-3 py-3 text-center">No analyst coverage for this security.</p></template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Returns & Risk -->
+                <div class="card p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                        <span class="text-[13px] font-semibold fg-0">Returns &amp; Risk</span>
+                    </div>
+                    <div x-show="!returnsData" class="grid grid-cols-4 md:grid-cols-8 gap-2"><template x-for="i in 8"><div class="skel h-14"></div></template></div>
+                    <div x-show="returnsData" x-cloak>
+                        <div class="grid grid-cols-4 md:grid-cols-8 gap-2 mb-5">
+                            <template x-for="p in returnPeriods" :key="p">
+                                <div class="bg-inset rounded-xl p-2.5 text-center">
+                                    <div class="text-[10px] fg-3 font-semibold uppercase" x-text="p"></div>
+                                    <div class="text-[13px] font-bold tabular-nums mt-0.5" :class="retClass(returnsData?.returns?.[p])" x-text="fmtRet(returnsData?.returns?.[p])"></div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4" style="border-top:1px solid var(--border-s)">
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 uppercase font-semibold tracking-wide">Volatility 1Y</div><div class="text-[15px] font-bold fg-0 tabular-nums mt-1" x-text="returnsData?.risk?.volatility!=null?returnsData.risk.volatility.toFixed(1)+'%':'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 uppercase font-semibold tracking-wide">Max Drawdown 3Y</div><div class="text-[15px] font-bold text-red-500 tabular-nums mt-1" x-text="returnsData?.risk?.maxDrawdown!=null?returnsData.risk.maxDrawdown.toFixed(1)+'%':'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 uppercase font-semibold tracking-wide">Sharpe 1Y</div><div class="text-[15px] font-bold fg-0 tabular-nums mt-1" x-text="returnsData?.risk?.sharpe!=null?returnsData.risk.sharpe.toFixed(2):'—'"></div></div>
+                            <div class="bg-inset rounded-xl p-3"><div class="text-[9px] fg-3 uppercase font-semibold tracking-wide">Beta</div><div class="text-[15px] font-bold fg-0 tabular-nums mt-1" x-text="analysisData?.beta?analysisData.beta.toFixed(2):'—'"></div></div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between text-[11px] mb-1.5"><span class="fg-3">52-Week Range</span><span class="fg-2" x-text="(returnsData?.risk?.rangePosition||0).toFixed(0)+'% of range'"></span></div>
+                            <div class="relative h-2 rounded-full bg-inset">
+                                <div class="absolute top-0 bottom-0 left-0 right-0 rounded-full" style="background:linear-gradient(90deg,rgba(248,113,113,.35),rgba(16,185,129,.35))"></div>
+                                <div class="absolute -top-1 w-1 h-4 bg-[var(--fg-0)] rounded" :style="'left:calc('+(returnsData?.risk?.rangePosition||50)+'% - 2px)'"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] fg-3 mt-1"><span x-text="fmtP(returnsData?.risk?.low52)"></span><span x-text="fmtP(returnsData?.risk?.high52)"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Earnings -->
+                <div class="card p-5" x-show="earningsData" x-cloak>
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <span class="text-[13px] font-semibold fg-0">Earnings</span>
+                        </div>
+                        <span x-show="earningsData?.nextDate" class="text-[11px] fg-2">Next: <span class="fg-0 font-semibold" x-text="fmtUnixDate(earningsData?.nextDate)"></span></span>
+                    </div>
+                    <div x-show="hasEarningsHistory()"><div id="eps-chart"></div><p class="text-[10px] fg-3 mt-1 text-center">Quarterly EPS — estimate vs actual</p></div>
+                    <div x-show="earningsData&&!hasEarningsHistory()" class="text-[12px] fg-3 py-4 text-center">No earnings history available.</div>
+                </div>
+            </div>
+
             <!-- Price Chart -->
             <div x-show="analysisTab==='Chart'" class="space-y-4 fade">
                 <div class="card p-5">
@@ -598,6 +763,29 @@
                         </div>
                     </div>
                 </template>
+            </div>
+
+            <!-- Dividends -->
+            <div x-show="analysisTab==='Dividends'" class="space-y-4 fade">
+                <div x-show="dividendLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
+                <template x-if="dividendData&&dividendData.hasDividend">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Forward Yield</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="dividendData?.yield?(dividendData.yield*100).toFixed(2)+'%':'—'"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Annual Rate</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="fmtP(dividendData?.rate)"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Payout Ratio</div><div class="text-lg font-bold mt-1 tabular-nums" :class="(dividendData?.payoutRatio||0)>0.8?'text-amber-500':'fg-0'" x-text="dividendData?.payoutRatio?(dividendData.payoutRatio*100).toFixed(0)+'%':'—'"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Growth Streak</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums"><span x-text="dividendData?.streak||0"></span> yrs</div></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">5Y Div CAGR</div><div class="text-lg font-bold tabular-nums mt-1" :class="retClass(dividendData?.growth5y)" x-text="fmtRet(dividendData?.growth5y)"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">All-time CAGR</div><div class="text-lg font-bold tabular-nums mt-1" :class="retClass(dividendData?.cagr)" x-text="fmtRet(dividendData?.cagr)"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">5Y Avg Yield</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="dividendData?.fiveYearAvgYield?dividendData.fiveYearAvgYield.toFixed(2)+'%':'—'"></div></div>
+                            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Latest Year</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="dividendData?.history?.length?dividendData.history[dividendData.history.length-1].year:'—'"></div></div>
+                        </div>
+                        <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Dividend Per Share History</div><div id="div-chart" style="min-height:260px"></div></div>
+                    </div>
+                </template>
+                <template x-if="dividendData&&!dividendData.hasDividend"><div class="card p-10 text-center"><p class="text-sm fg-3">This security does not currently pay a dividend.</p></div></template>
             </div>
 
             <!-- SEC Filings -->
@@ -730,11 +918,11 @@
                 <div class="flex-1 min-w-[180px]"><label class="text-[11px] fg-3 font-medium block mb-1">Tickers</label><input type="text" x-model="compareInput" @keydown.enter="loadCompare()" placeholder="AAPL, MSFT, GOOGL" class="w-full px-4 py-2.5 rounded-[10px] text-sm input-f"></div>
                 <div><label class="text-[11px] fg-3 font-medium block mb-1">Period</label><select x-model="comparePeriod" class="px-3 py-2.5 rounded-[10px] text-sm input-f"><option value="1mo">1M</option><option value="3mo">3M</option><option value="6mo">6M</option><option value="1y" selected>1Y</option><option value="2y">2Y</option><option value="5y">5Y</option></select></div>
                 <button @click="loadCompare()" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Compare</button>
-                <button x-show="compareData&&Object.keys(compareData).length" @click="exportCompareCSV()" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
+                <button x-show="compareData&&Object.keys(compareData||{}).length" @click="exportCompareCSV()" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
                 <div x-show="compareLoading" class="spinner"></div>
             </div>
         </div>
-        <div x-show="compareData&&Object.keys(compareData).length" x-cloak>
+        <div x-show="compareData&&Object.keys(compareData||{}).length" x-cloak>
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
                 <div class="lg:col-span-2 card p-5">
                     <div class="text-[13px] font-semibold fg-0 mb-3">Relative Performance</div>
@@ -749,7 +937,7 @@
             <div class="card overflow-hidden">
                 <div class="overflow-x-auto"><table class="w-full text-[13px]">
                     <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th>
-                        <template x-for="s in Object.keys(compareData)" :key="s"><th class="text-right p-3.5">
+                        <template x-for="s in Object.keys(compareData||{})" :key="s"><th class="text-right p-3.5">
                             <div class="flex items-center justify-end gap-2">
                                 <div class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 bg-[var(--bg-2)] flex items-center justify-center" x-data="{lvl:0}">
                                     <img x-show="lvl===0" :src="logoUrl(s)" @error="lvl=1" loading="lazy" class="w-full h-full object-contain">
@@ -760,7 +948,7 @@
                             </div>
                         </th></template>
                     </tr></thead>
-                    <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData)" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="cmpCellClass(s,m.key)" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
+                    <tbody><template x-for="m in compareMetrics" :key="m.key"><tr class="hover:bg-[var(--bg-2)]" style="border-bottom:1px solid var(--border-s)"><td class="p-3.5 fg-1" x-text="m.label"></td><template x-for="s in Object.keys(compareData||{})" :key="s+m.key"><td class="p-3.5 text-right font-medium tabular-nums" :class="cmpCellClass(s,m.key)" x-text="fmtMetric(compareData[s]?.[m.key],m.format)"></td></template></tr></template></tbody>
                 </table></div>
             </div>
         </div>
@@ -782,9 +970,39 @@
             <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">P&L</div><div :class="ptp()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptp()>=0?'+':'-'"></span>$<span x-text="Math.abs(ptp()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
             <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Return</div><div :class="ptr()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptr()>=0?'+':''"></span><span x-text="ptr().toFixed(2)"></span>%</div></div>
         </div>
+        <!-- Portfolio Intelligence -->
+        <div x-show="portfolio.length&&portfolioAnalytics&&portfolioAnalytics.holdings" x-cloak class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Day Change</div><div class="text-[15px] font-bold mt-1 tabular-nums" :class="(portfolioAnalytics?.dayChange||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChange||0)>=0?'+':'-'"></span>$<span x-text="Math.abs(portfolioAnalytics?.dayChange||0).toLocaleString('en-US',{maximumFractionDigits:0})"></span></div><div class="text-[10px] tabular-nums" :class="(portfolioAnalytics?.dayChangePct||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChangePct||0)>=0?'+':''"></span><span x-text="(portfolioAnalytics?.dayChangePct||0).toFixed(2)"></span>%</div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">vs S&P 500</div><div class="text-[15px] font-bold mt-1 tabular-nums" :class="relSpy()>=0?'text-emerald-500':'text-red-500'"><span x-text="relSpy()>=0?'+':''"></span><span x-text="relSpy().toFixed(2)"></span>%</div><div class="text-[10px] fg-3">SPY <span x-text="portfolioAnalytics?.spyDayChange!=null?(portfolioAnalytics.spyDayChange>=0?'+':'')+portfolioAnalytics.spyDayChange.toFixed(2)+'%':'—'"></span></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Annual Income</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="'$'+(portfolioAnalytics?.annualIncome||0).toLocaleString('en-US',{maximumFractionDigits:0})"></div><div class="text-[10px] fg-3"><span x-text="(portfolioAnalytics?.portfolioYield||0).toFixed(2)"></span>% yield</div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Yield on Cost</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.yieldOnCost||0).toFixed(2)+'%'"></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Portfolio Beta</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.beta||0).toFixed(2)"></div><div class="text-[10px] fg-3" x-text="(portfolioAnalytics?.beta||0)>1?'more volatile':'less volatile'"></div></div>
+            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Top Position</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.topWeight||0).toFixed(0)+'%'"></div><div class="text-[10px] fg-3 truncate" x-text="portfolioAnalytics?.diversification"></div></div>
+        </div>
         <div x-show="portfolio.length" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Allocation</div><div id="p-alloc" style="min-height:260px"></div></div>
             <div class="card p-5 lg:col-span-2"><div class="text-[13px] font-semibold fg-0 mb-3">P&L by Holding</div><div id="p-perf" style="min-height:260px"></div></div>
+        </div>
+        <!-- Sector Allocation -->
+        <div x-show="portfolio.length&&portfolioAnalytics?.sectorAllocation?.length" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+            <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">By Sector</div><div id="p-sector" style="min-height:260px"></div></div>
+            <div class="card p-5 lg:col-span-2">
+                <div class="text-[13px] font-semibold fg-0 mb-4">Sector Breakdown</div>
+                <div class="space-y-2.5">
+                    <template x-for="s in portfolioAnalytics?.sectorAllocation||[]" :key="s.sector">
+                        <div class="flex items-center gap-3">
+                            <span class="text-[12px] fg-1 w-32 md:w-40 truncate flex-shrink-0" x-text="s.sector"></span>
+                            <div class="flex-1 score-bar"><div class="fill" :style="'width:'+s.pct+'%;background:#6366f1'"></div></div>
+                            <span class="text-[12px] fg-0 font-semibold w-12 text-right tabular-nums flex-shrink-0" x-text="s.pct+'%'"></span>
+                            <span class="text-[11px] fg-3 w-20 text-right tabular-nums flex-shrink-0 hidden sm:inline" x-text="'$'+s.value.toLocaleString('en-US',{maximumFractionDigits:0})"></span>
+                        </div>
+                    </template>
+                    <div class="flex items-center justify-between pt-3 mt-1 text-[12px]" style="border-top:1px solid var(--border-s)">
+                        <div class="flex items-center gap-2"><span class="fg-3">Best:</span><span class="text-emerald-500 font-semibold" x-text="portfolioAnalytics?.best?(portfolioAnalytics.best.symbol+' +'+portfolioAnalytics.best.retPct.toFixed(1)+'%'):'—'"></span></div>
+                        <div class="flex items-center gap-2"><span class="fg-3">Worst:</span><span class="font-semibold" :class="(portfolioAnalytics?.worst?.retPct||0)>=0?'text-emerald-500':'text-red-500'" x-text="portfolioAnalytics?.worst?(portfolioAnalytics.worst.symbol+' '+(portfolioAnalytics.worst.retPct>=0?'+':'')+portfolioAnalytics.worst.retPct.toFixed(1)+'%'):'—'"></span></div>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="card overflow-hidden">
             <div x-show="portfolioLoading" class="p-6 space-y-3"><template x-for="i in 3"><div class="skel h-12"></div></template></div>

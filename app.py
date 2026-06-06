@@ -1,12 +1,15 @@
 import gzip
 import json
 import logging
+import math
+import re
 import sqlite3
 import os
+import time
 import urllib.parse
 import urllib.request
-from collections import OrderedDict
-from datetime import datetime, timedelta
+from collections import OrderedDict, defaultdict
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, jsonify, request, g
@@ -23,10 +26,9 @@ app = Flask(__name__)
 
 _allowed_origins = [
     "https://davidvicunap.github.io",
-    "http://localhost:5000",
-    "http://localhost:8050",
-    "http://127.0.0.1:5000",
-    "http://127.0.0.1:8050",
+    # Any localhost port for local development (CORS guards browsers, not the
+    # server; authenticated calls still require a valid JWT).
+    re.compile(r"^http://(localhost|127\.0\.0\.1):\d+$"),
 ]
 CORS(app, origins=_allowed_origins)
 
@@ -99,8 +101,8 @@ def create_token(user_id, email):
     payload = {
         "user_id": user_id,
         "email": email,
-        "exp": datetime.utcnow() + timedelta(days=30),
-        "iat": datetime.utcnow(),
+        "exp": datetime.now(timezone.utc) + timedelta(days=30),
+        "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, app.config["SECRET_KEY"], algorithm="HS256")
 
@@ -136,6 +138,36 @@ def optional_auth(f):
     return decorated
 
 
+# -- Rate Limiting (in-memory, per-IP) ----------------------------------------
+
+_rate_buckets = defaultdict(list)
+
+
+def _client_ip():
+    fwd = request.headers.get("X-Forwarded-For", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def rate_limit(bucket, max_hits=10, window=300):
+    """Return True if the caller is within the limit, False if throttled.
+
+    Sliding window keyed by (bucket, client IP). Used to blunt credential
+    stuffing / brute-force against the auth endpoints.
+    """
+    now = time.time()
+    key = f"{bucket}:{_client_ip()}"
+    hits = [t for t in _rate_buckets[key] if now - t < window]
+    hits.append(now)
+    _rate_buckets[key] = hits
+    if len(_rate_buckets) > 5000:  # crude memory guard
+        for k in list(_rate_buckets):
+            if not any(now - t < window for t in _rate_buckets[k]):
+                del _rate_buckets[k]
+    return len(hits) <= max_hits
+
+
 # -- LRU Cache with TTL -------------------------------------------------------
 
 class LRUCache:
@@ -150,14 +182,14 @@ class LRUCache:
         entry = self._data.get(key)
         if entry is None:
             return None
-        if (datetime.utcnow().timestamp() - entry[1]) > ttl:
+        if (datetime.now(timezone.utc).timestamp() - entry[1]) > ttl:
             self._data.pop(key, None)
             return None
         self._data.move_to_end(key)
         return entry[0]
 
     def put(self, key, value):
-        self._data[key] = (value, datetime.utcnow().timestamp())
+        self._data[key] = (value, datetime.now(timezone.utc).timestamp())
         self._data.move_to_end(key)
         while len(self._data) > self._maxsize:
             self._data.popitem(last=False)
@@ -204,6 +236,31 @@ def safe_get(d, key, default=None):
         return v
     except Exception:
         return default
+
+
+def dividend_yield_fraction(info, price=None):
+    """Return the forward dividend yield as a *fraction* (e.g. 0.027 for 2.7%).
+
+    yfinance is inconsistent across versions: older releases returned a fraction
+    while >=0.2.40 returns a percent number (e.g. 2.67 for 2.67%). Computing it
+    from the annual dividend rate and price is version-independent, so prefer
+    that and only fall back to the (percent-scaled) `dividendYield` field.
+    """
+    rate = safe_get(info, "dividendRate", 0) or 0
+    price = price or safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0) or 0
+    if rate and price:
+        return round(rate / price, 5)
+    raw = safe_get(info, "dividendYield", 0) or 0
+    if not raw:
+        return 0
+    # Heuristic: a "fraction" yield above 1.0 (100%) is implausible, so any
+    # value >1 is certainly already a percent; modern yfinance always is.
+    return round(raw / 100.0, 5)
+
+
+def peg_ratio(info):
+    """PEG ratio, preferring `trailingPegRatio` when the legacy field is absent."""
+    return safe_get(info, "pegRatio", 0) or safe_get(info, "trailingPegRatio", 0) or 0
 
 
 # -- Response Cache -----------------------------------------------------------
@@ -274,6 +331,8 @@ def health():
 
 @app.route("/api/auth/register", methods=["POST"])
 def api_register():
+    if not rate_limit("register", max_hits=10, window=3600):
+        return jsonify({"error": "Too many attempts. Please try again later."}), 429
     data = request.get_json()
     if not data or not data.get("email") or not data.get("password"):
         return jsonify({"error": "Email and password are required"}), 400
@@ -306,6 +365,8 @@ def api_register():
 
 @app.route("/api/auth/login", methods=["POST"])
 def api_login():
+    if not rate_limit("login", max_hits=15, window=300):
+        return jsonify({"error": "Too many login attempts. Please wait a few minutes."}), 429
     data = request.get_json()
     if not data or not data.get("email") or not data.get("password"):
         return jsonify({"error": "Email and password are required"}), 400
@@ -342,6 +403,7 @@ def api_me():
 # -- API: Search --------------------------------------------------------------
 
 @app.route("/api/search")
+@cache_response(600)
 def api_search():
     q = request.args.get("q", "").strip()
     if len(q) < 1:
@@ -388,7 +450,8 @@ def api_quote(symbol):
             "forwardPE": safe_get(info, "forwardPE", 0),
             "eps": safe_get(info, "trailingEps", 0),
             "forwardEps": safe_get(info, "forwardEps", 0),
-            "dividendYield": safe_get(info, "dividendYield", 0),
+            "dividendYield": dividend_yield_fraction(info),
+            "dividendRate": safe_get(info, "dividendRate", 0),
             "beta": safe_get(info, "beta", 0),
             "fiftyTwoWeekHigh": safe_get(info, "fiftyTwoWeekHigh", 0),
             "fiftyTwoWeekLow": safe_get(info, "fiftyTwoWeekLow", 0),
@@ -426,7 +489,9 @@ def api_quote(symbol):
             "totalCash": safe_get(info, "totalCash", 0),
             "totalDebt": safe_get(info, "totalDebt", 0),
             "enterpriseValue": safe_get(info, "enterpriseValue", 0),
-            "pegRatio": safe_get(info, "pegRatio", 0),
+            "pegRatio": peg_ratio(info),
+            "sharesOutstanding": safe_get(info, "sharesOutstanding", 0),
+            "nextEarningsDate": safe_get(info, "earningsTimestamp", 0),
         }
         price = quote["price"] or 0
         prev = quote["previousClose"] or 0
@@ -576,7 +641,7 @@ def api_compare():
                 "peRatio": safe_get(info, "trailingPE", 0),
                 "forwardPE": safe_get(info, "forwardPE", 0),
                 "eps": safe_get(info, "trailingEps", 0),
-                "dividendYield": safe_get(info, "dividendYield", 0),
+                "dividendYield": dividend_yield_fraction(info),
                 "beta": safe_get(info, "beta", 0),
                 "profitMargin": safe_get(info, "profitMargins", 0),
                 "returnOnEquity": safe_get(info, "returnOnEquity", 0),
@@ -939,7 +1004,7 @@ def api_score(symbol):
             else:
                 val_score += 2
 
-        peg = safe_get(info, "pegRatio", 0)
+        peg = peg_ratio(info)
         if peg and peg > 0:
             val_factors += 1
             if peg < 1:
@@ -1069,7 +1134,7 @@ def api_score(symbol):
                 "earningsGrowth": safe_get(info, "earningsGrowth", 0),
                 "peRatio": safe_get(info, "trailingPE", 0),
                 "priceToBook": safe_get(info, "priceToBook", 0),
-                "pegRatio": safe_get(info, "pegRatio", 0),
+                "pegRatio": peg_ratio(info),
                 "debtToEquity": safe_get(info, "debtToEquity", 0),
                 "currentRatio": safe_get(info, "currentRatio", 0),
                 "freeCashflow": safe_get(info, "freeCashflow", 0),
@@ -1088,7 +1153,7 @@ _SEC_TICKERS_TTL = 86400
 
 def _get_sec_cik(symbol):
     global _sec_tickers_cache, _sec_tickers_cache_time
-    now = datetime.utcnow().timestamp()
+    now = datetime.now(timezone.utc).timestamp()
     if not _sec_tickers_cache or (now - _sec_tickers_cache_time) > _SEC_TICKERS_TTL:
         url = "https://www.sec.gov/files/company_tickers.json"
         req = urllib.request.Request(url, headers={
@@ -1231,6 +1296,413 @@ def api_peers(symbol):
         })
     except Exception as e:
         return jsonify({"error": "Server error"}), 500
+
+
+# -- API: Returns & Risk ------------------------------------------------------
+
+@app.route("/api/returns/<symbol>")
+@cache_response(120)
+def api_returns(symbol):
+    """Multi-timeframe price returns plus risk metrics (volatility, drawdown,
+    Sharpe, 52-week range position) — the numbers investors check first."""
+    try:
+        t = get_ticker(symbol)
+        # 10y window so the 5Y lookback always resolves; risk metrics below use
+        # their own trailing slices.
+        df = t.history(period="10y", interval="1d")
+        if df.empty:
+            return jsonify({"error": "No data"}), 404
+        close = df["Close"].dropna()
+        if len(close) < 2:
+            return jsonify({"error": "No data"}), 404
+
+        last = float(close.iloc[-1])
+        idx = close.index
+        now = idx[-1]
+
+        def ret_for(delta):
+            past = close[close.index <= now - delta]
+            if len(past) == 0:
+                return None
+            base = float(past.iloc[-1])
+            return round((last / base - 1) * 100, 2) if base else None
+
+        returns = {
+            "1W": ret_for(timedelta(days=7)),
+            "1M": ret_for(timedelta(days=30)),
+            "3M": ret_for(timedelta(days=91)),
+            "6M": ret_for(timedelta(days=182)),
+            "1Y": ret_for(timedelta(days=365)),
+            "3Y": ret_for(timedelta(days=365 * 3)),
+            "5Y": ret_for(timedelta(days=365 * 5)),
+        }
+        year_start = pd.Timestamp(year=now.year, month=1, day=1, tz=idx.tz)
+        prior = close[close.index < year_start]
+        base_ytd = float(prior.iloc[-1]) if len(prior) else float(close.iloc[0])
+        returns["YTD"] = round((last / base_ytd - 1) * 100, 2) if base_ytd else None
+
+        one_y = close[close.index >= now - timedelta(days=365)]
+        three_y = close[close.index >= now - timedelta(days=365 * 3)]
+
+        # Annualized volatility from the last year of daily returns.
+        daily_1y = one_y.pct_change().dropna()
+        vol = round(float(daily_1y.std() * math.sqrt(252) * 100), 2) if len(daily_1y) > 20 else None
+        # Worst peak-to-trough over the last three years.
+        dd = three_y / three_y.cummax() - 1.0
+        max_dd = round(float(dd.min() * 100), 2) if len(dd) else None
+
+        hi = float(one_y.max()) if len(one_y) else last
+        lo = float(one_y.min()) if len(one_y) else last
+        pos = round((last - lo) / (hi - lo) * 100, 1) if hi > lo else 50.0
+        sharpe = None
+        if len(daily_1y) > 20 and daily_1y.std() > 0:
+            sharpe = round(float(daily_1y.mean() / daily_1y.std() * math.sqrt(252)), 2)
+
+        return jsonify({
+            "symbol": symbol.upper(),
+            "returns": returns,
+            "risk": {
+                "volatility": vol,
+                "maxDrawdown": max_dd,
+                "sharpe": sharpe,
+                "high52": round(hi, 2),
+                "low52": round(lo, 2),
+                "rangePosition": pos,
+            },
+        })
+    except Exception:
+        log.exception("returns error %s", symbol)
+        return jsonify({"error": "Failed to compute returns"}), 500
+
+
+# -- API: Dividends -----------------------------------------------------------
+
+@app.route("/api/dividends/<symbol>")
+@cache_response(3600)
+def api_dividends(symbol):
+    """Dividend history, growth (CAGR), payout sustainability and streak."""
+    try:
+        t = get_ticker(symbol)
+        info = get_info(symbol)
+        price = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
+        result = {
+            "symbol": symbol.upper(),
+            "hasDividend": False,
+            "yield": dividend_yield_fraction(info, price),
+            "rate": safe_get(info, "dividendRate", 0),
+            "payoutRatio": safe_get(info, "payoutRatio", 0),
+            "fiveYearAvgYield": safe_get(info, "fiveYearAvgDividendYield", 0),
+            "history": [],
+            "cagr": None,
+            "growth5y": None,
+            "streak": 0,
+        }
+        divs = t.dividends
+        if divs is None or len(divs) == 0:
+            return jsonify(result)
+        result["hasDividend"] = True
+
+        by_year = defaultdict(float)
+        for ts, val in divs.items():
+            by_year[ts.year] += float(val)
+        years = sorted(by_year)
+        result["history"] = [{"year": y, "amount": round(by_year[y], 4)} for y in years][-12:]
+
+        this_year = datetime.now(timezone.utc).year
+        complete = [y for y in years if y < this_year]
+        if len(complete) >= 2:
+            n = complete[-1] - complete[0]
+            first, latest = by_year[complete[0]], by_year[complete[-1]]
+            if first > 0 and n > 0:
+                result["cagr"] = round(((latest / first) ** (1 / n) - 1) * 100, 2)
+            recent = [y for y in complete if y >= complete[-1] - 5]
+            if len(recent) >= 2 and by_year[recent[0]] > 0:
+                rn = recent[-1] - recent[0]
+                if rn > 0:
+                    result["growth5y"] = round(((by_year[recent[-1]] / by_year[recent[0]]) ** (1 / rn) - 1) * 100, 2)
+            streak = 0
+            for i in range(len(complete) - 1, 0, -1):
+                if by_year[complete[i]] >= by_year[complete[i - 1]]:
+                    streak += 1
+                else:
+                    break
+            result["streak"] = streak
+        return jsonify(result)
+    except Exception:
+        log.exception("dividends error %s", symbol)
+        return jsonify({"error": "Failed to fetch dividends"}), 500
+
+
+# -- API: Analyst Coverage ----------------------------------------------------
+
+@app.route("/api/analysts/<symbol>")
+@cache_response(600)
+def api_analysts(symbol):
+    """Analyst consensus: price targets with implied upside and the buy/hold/sell
+    distribution (the breadth behind a single 'buy' rating)."""
+    try:
+        info = get_info(symbol)
+        t = get_ticker(symbol)
+        price = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
+        target = safe_get(info, "targetMeanPrice", 0)
+        result = {
+            "symbol": symbol.upper(),
+            "price": price,
+            "targetMean": target,
+            "targetHigh": safe_get(info, "targetHighPrice", 0),
+            "targetLow": safe_get(info, "targetLowPrice", 0),
+            "targetMedian": safe_get(info, "targetMedianPrice", 0),
+            "upside": round((target - price) / price * 100, 2) if price and target else None,
+            "recommendationKey": safe_get(info, "recommendationKey", ""),
+            "recommendationMean": safe_get(info, "recommendationMean", 0),
+            "numberOfAnalysts": safe_get(info, "numberOfAnalystOpinions", 0),
+            "distribution": None,
+        }
+        try:
+            rec = t.recommendations
+            if rec is not None and not rec.empty:
+                if "period" in rec.columns:
+                    cur = rec[rec["period"] == "0m"]
+                    row = (cur.iloc[0] if len(cur) else rec.iloc[0]).to_dict()
+                else:
+                    row = rec.iloc[0].to_dict()
+                dist = {k: int(row.get(k, 0) or 0) for k in ["strongBuy", "buy", "hold", "sell", "strongSell"]}
+                if sum(dist.values()) > 0:
+                    result["distribution"] = dist
+        except Exception:
+            pass
+        return jsonify(result)
+    except Exception:
+        log.exception("analysts error %s", symbol)
+        return jsonify({"error": "Failed to fetch analyst data"}), 500
+
+
+# -- API: Valuation / Fair Value ----------------------------------------------
+
+@app.route("/api/valuation/<symbol>")
+@cache_response(900)
+def api_valuation(symbol):
+    """Transparent fair-value estimate blending analyst consensus, an earnings-
+    growth multiple (PEG=1, Lynch) and a 5-year DCF. Each method shows its
+    assumptions so the user can judge it rather than trust a black box."""
+    try:
+        info = get_info(symbol)
+        price = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
+        methods = []
+
+        target = safe_get(info, "targetMeanPrice", 0)
+        if target and target > 0:
+            n = safe_get(info, "numberOfAnalystOpinions", 0)
+            methods.append({"method": "Analyst Consensus", "fairValue": round(target, 2),
+                            "detail": f"{n} analyst targets" if n else "Mean price target"})
+
+        fwd_eps = safe_get(info, "forwardEps", 0)
+        growth = safe_get(info, "earningsGrowth", 0) or safe_get(info, "revenueGrowth", 0) or 0
+        if fwd_eps and fwd_eps > 0 and growth and growth > 0:
+            fair_pe = min(max(growth * 100, 8), 35)
+            methods.append({"method": "Earnings Growth", "fairValue": round(fwd_eps * fair_pe, 2),
+                            "detail": f"Fwd EPS ${fwd_eps:.2f} x {fair_pe:.0f} (PEG 1.0)"})
+
+        fcf = safe_get(info, "freeCashflow", 0)
+        shares = safe_get(info, "sharesOutstanding", 0)
+        total_debt = safe_get(info, "totalDebt", 0) or 0
+        total_cash = safe_get(info, "totalCash", 0) or 0
+        assumptions = None
+        if fcf and fcf > 0 and shares and shares > 0:
+            g = max(min(growth or 0.05, 0.15), 0.02)
+            disc, term = 0.09, 0.025
+            pv, cf = 0.0, fcf
+            for yr in range(1, 6):
+                cf *= (1 + g)
+                pv += cf / ((1 + disc) ** yr)
+            pv += cf * (1 + term) / (disc - term) / ((1 + disc) ** 5)
+            fair = (pv - total_debt + total_cash) / shares
+            if fair > 0:
+                methods.append({"method": "DCF (5Y + terminal)", "fairValue": round(fair, 2),
+                                "detail": f"{g * 100:.0f}% growth, 9% discount"})
+                assumptions = {"growth": round(g * 100, 1), "discount": 9.0, "terminal": 2.5}
+
+        composite = None
+        vals = [m["fairValue"] for m in methods if m["fairValue"] > 0]
+        if vals:
+            composite = round(sum(vals) / len(vals), 2)
+        upside = round((composite - price) / price * 100, 2) if composite and price else None
+        verdict = "—"
+        if upside is not None:
+            verdict = "Undervalued" if upside > 12 else "Overvalued" if upside < -12 else "Fairly Valued"
+
+        return jsonify({
+            "symbol": symbol.upper(),
+            "price": price,
+            "fairValue": composite,
+            "upside": upside,
+            "verdict": verdict,
+            "methods": methods,
+            "currentPE": safe_get(info, "trailingPE", 0),
+            "forwardPE": safe_get(info, "forwardPE", 0),
+            "pegRatio": peg_ratio(info),
+            "priceToBook": safe_get(info, "priceToBook", 0),
+            "assumptions": assumptions,
+        })
+    except Exception:
+        log.exception("valuation error %s", symbol)
+        return jsonify({"error": "Failed to compute valuation"}), 500
+
+
+# -- API: Earnings ------------------------------------------------------------
+
+@app.route("/api/earnings/<symbol>")
+@cache_response(1800)
+def api_earnings(symbol):
+    """Earnings beat/miss history and the next reporting date."""
+    try:
+        t = get_ticker(symbol)
+        info = get_info(symbol)
+        result = {"symbol": symbol.upper(), "nextDate": safe_get(info, "earningsTimestamp", 0), "history": []}
+        try:
+            ed = t.get_earnings_dates(limit=12)
+            if ed is not None and not ed.empty:
+                hist = []
+                for ts, row in ed.iterrows():
+                    est = row.get("EPS Estimate")
+                    act = row.get("Reported EPS")
+                    surp = row.get("Surprise(%)")
+                    # yfinance's "Surprise(%)" column is already expressed in percent.
+                    s = None if surp is None or pd.isna(surp) else round(float(surp), 1)
+                    hist.append({
+                        "date": ts.strftime("%Y-%m-%d"),
+                        "epsEstimate": None if est is None or pd.isna(est) else round(float(est), 2),
+                        "epsActual": None if act is None or pd.isna(act) else round(float(act), 2),
+                        "surprisePct": s,
+                    })
+                result["history"] = hist
+        except Exception:
+            pass
+        return jsonify(result)
+    except Exception:
+        log.exception("earnings error %s", symbol)
+        return jsonify({"error": "Failed to fetch earnings"}), 500
+
+
+# -- API: Portfolio Analytics -------------------------------------------------
+
+@app.route("/api/portfolio/analytics")
+@require_auth
+def api_portfolio_analytics():
+    """Portfolio-level intelligence: sector mix, income, beta, concentration and
+    a benchmark read — the context a P&L table alone can't give."""
+    db = get_db()
+    user = g.current_user
+    rows = db.execute("SELECT * FROM holdings WHERE user_id = ?", (user["user_id"],)).fetchall()
+    holdings = [dict(r) for r in rows]
+    if not holdings:
+        return jsonify({"holdings": 0})
+
+    def enrich(h):
+        try:
+            info = get_info(h["symbol"])
+            price = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0) or 0
+            return {
+                "symbol": h["symbol"], "shares": h["shares"], "buy_price": h["buy_price"],
+                "price": price, "prevClose": safe_get(info, "previousClose", 0) or price,
+                "sector": safe_get(info, "sector", "Other") or "Other",
+                "beta": safe_get(info, "beta", 0) or 0,
+                "divRate": safe_get(info, "dividendRate", 0) or 0,
+            }
+        except Exception:
+            return {"symbol": h["symbol"], "shares": h["shares"], "buy_price": h["buy_price"],
+                    "price": 0, "prevClose": 0, "sector": "Other", "beta": 0, "divRate": 0}
+
+    with ThreadPoolExecutor(max_workers=min(len(holdings), 8)) as ex:
+        en = list(ex.map(enrich, holdings))
+
+    total_val = sum(e["price"] * e["shares"] for e in en)
+    total_cost = sum(e["buy_price"] * e["shares"] for e in en)
+    prev_val = sum(e["prevClose"] * e["shares"] for e in en)
+    day_change = total_val - prev_val
+    annual_income = sum(e["divRate"] * e["shares"] for e in en)
+
+    sectors = defaultdict(float)
+    for e in en:
+        sectors[e["sector"]] += e["price"] * e["shares"]
+    sector_alloc = [{"sector": s, "value": round(v, 2), "pct": round(v / total_val * 100, 1) if total_val else 0}
+                    for s, v in sorted(sectors.items(), key=lambda x: -x[1])]
+
+    weights = [e["price"] * e["shares"] / total_val for e in en] if total_val else []
+    pbeta = sum(w * e["beta"] for w, e in zip(weights, en)) if weights else 0
+    hhi = round(sum((w * 100) ** 2 for w in weights), 0) if weights else 0
+    top_weight = round(max(weights) * 100, 1) if weights else 0
+
+    for e in en:
+        e["retPct"] = ((e["price"] - e["buy_price"]) / e["buy_price"] * 100) if e["buy_price"] else 0
+    best = max(en, key=lambda x: x["retPct"])
+    worst = min(en, key=lambda x: x["retPct"])
+
+    spy_day = None
+    try:
+        spy = get_info("SPY")
+        sp = safe_get(spy, "currentPrice") or safe_get(spy, "regularMarketPrice", 0)
+        spc = safe_get(spy, "previousClose", 0)
+        if sp and spc:
+            spy_day = round((sp - spc) / spc * 100, 2)
+    except Exception:
+        pass
+
+    return jsonify({
+        "holdings": len(en),
+        "totalValue": round(total_val, 2),
+        "totalCost": round(total_cost, 2),
+        "dayChange": round(day_change, 2),
+        "dayChangePct": round(day_change / prev_val * 100, 2) if prev_val else 0,
+        "annualIncome": round(annual_income, 2),
+        "portfolioYield": round(annual_income / total_val * 100, 2) if total_val else 0,
+        "yieldOnCost": round(annual_income / total_cost * 100, 2) if total_cost else 0,
+        "beta": round(pbeta, 2),
+        "hhi": hhi,
+        "topWeight": top_weight,
+        "diversification": "Well diversified" if hhi < 1500 else "Moderately concentrated" if hhi < 2500 else "Highly concentrated",
+        "sectorAllocation": sector_alloc,
+        "best": {"symbol": best["symbol"], "retPct": round(best["retPct"], 2)},
+        "worst": {"symbol": worst["symbol"], "retPct": round(worst["retPct"], 2)},
+        "spyDayChange": spy_day,
+    })
+
+
+# -- API: Market Movers -------------------------------------------------------
+
+_MOVERS_UNIVERSE = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "JPM", "V",
+    "WMT", "UNH", "XOM", "MA", "PG", "JNJ", "HD", "COST", "ORCL", "BAC",
+    "KO", "PEP", "NFLX", "AMD", "CRM", "ADBE", "DIS", "INTC", "QCOM", "PLTR",
+    "COIN", "UBER", "BA", "PFE", "CSCO", "NKE", "SBUX", "T", "F", "GM",
+]
+
+
+@app.route("/api/movers")
+@cache_response(120)
+def api_movers():
+    """Top gainers/losers across a liquid large-cap universe, computed from one
+    batched download so the dashboard surfaces 'what's moving' for free."""
+    try:
+        data = yf.download(_MOVERS_UNIVERSE, period="2d", interval="1d",
+                           group_by="ticker", threads=True, progress=False)
+        moves = []
+        for sym in _MOVERS_UNIVERSE:
+            try:
+                closes = data[sym]["Close"].dropna()
+                if len(closes) >= 2:
+                    last, prev = float(closes.iloc[-1]), float(closes.iloc[-2])
+                    if prev:
+                        moves.append({"symbol": sym, "price": round(last, 2),
+                                      "changePercent": round((last - prev) / prev * 100, 2)})
+            except Exception:
+                continue
+        moves.sort(key=lambda x: x["changePercent"], reverse=True)
+        losers = moves[-6:][::-1] if len(moves) >= 6 else moves[::-1]
+        return jsonify({"gainers": moves[:6], "losers": losers})
+    except Exception:
+        log.exception("movers error")
+        return jsonify({"gainers": [], "losers": []})
 
 
 # -- Run ----------------------------------------------------------------------

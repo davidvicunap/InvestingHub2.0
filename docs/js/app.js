@@ -35,17 +35,22 @@ function app() {
         ],
 
         marketData:[], marketLoading:false,
+        movers:{gainers:[],losers:[]}, moversLoading:false,
         watchlist:[], watchlistLoading:false,
         portfolio:[], portfolioLoading:false,
+        portfolioAnalytics:null, portfolioAnalyticsLoading:false,
         showAddHolding:false, newHolding:{symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
         showEditHolding:false, editingHolding:{id:null,symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
 
         analysisSymbol:'', analysisData:null, analysisStats:[], analysisLoading:false,
-        analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','SEC Filings','Profile'],
+        analysisTab:'Overview', analysisTabs:['Overview','Chart','Technicals','Fundamentals','Financials','Dividends','SEC Filings','Profile'],
         chartPeriod:'1y', techPeriod:'1y',
         fundamentalsData:null, finTab:'income', finPeriod:'annual',
         stockScore:null,
         secFilings:null, secFilingsLoading:false,
+        returnsData:null, valuationData:null, analystData:null, earningsData:null,
+        dividendData:null, dividendLoading:false,
+        returnPeriods:['1W','1M','3M','6M','YTD','1Y','3Y','5Y'],
         scoreCategories:[
             {key:'profitability',label:'Profitability',desc:'Margins & ROE',weight:25},
             {key:'growth',label:'Growth',desc:'Revenue & Earnings',weight:20},
@@ -72,8 +77,8 @@ function app() {
 
         apex:{}, tv:{},
         _apiCache:{},
-        _cacheTTLs:{'/api/market':60,'/api/watchlist':30,'/api/portfolio':30},
-        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/sec-filings/',120],['/api/peers/',300],['/api/compare?',60]],
+        _cacheTTLs:{'/api/market':60,'/api/watchlist':30,'/api/portfolio':30,'/api/portfolio/analytics':30,'/api/movers':120},
+        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/sec-filings/',120],['/api/peers/',300],['/api/compare?',60],['/api/returns/',120],['/api/dividends/',600],['/api/analysts/',300],['/api/valuation/',600],['/api/earnings/',600]],
 
         init() {
             this.applyTheme();
@@ -89,7 +94,7 @@ function app() {
                 try{
                     await fetch(API_BASE+'/',{signal:AbortSignal.timeout(10000)});
                     this.connectionError=false; this.backendWaking=false;
-                    if(this.authToken){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}
+                    if(this.authToken){this.loadMarketData();this.loadWatchlist();this.loadPortfolio();this.loadMovers()}
                     return;
                 }catch(e){
                     attempt++;
@@ -116,7 +121,7 @@ function app() {
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
                 this.showLoginModal=false;this.loginForm={email:'',password:''};
-                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
+                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();this.loadMovers();
             } catch(e){this.authError=e.name==='TimeoutError'?'Server is waking up — please try again in a few seconds.':'Connection error — the server may be starting up. Please try again.'}
             this.authLoading=false;
         },
@@ -130,7 +135,7 @@ function app() {
                 this.authToken=d.token;this.currentUser=d.user;
                 localStorage.setItem('investorhub-token',d.token);localStorage.setItem('investorhub-user',JSON.stringify(d.user));
                 this.showRegisterModal=false;this.registerForm={name:'',email:'',password:''};
-                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();
+                this.loadMarketData();this.loadPortfolio();this.loadWatchlist();this.loadMovers();
             } catch(e){this.authError=e.name==='TimeoutError'?'Server is waking up — please try again in a few seconds.':'Connection error — the server may be starting up. Please try again.'}
             this.authLoading=false;
         },
@@ -143,12 +148,12 @@ function app() {
         toggleTheme(){this.darkMode=!this.darkMode;this.applyTheme();localStorage.setItem('investorhub-theme',this.darkMode?'dark':'light');this.reRender()},
         applyTheme(){document.documentElement.classList.toggle('dark',this.darkMode)},
         tc(){return this.darkMode?{bg:'#0f1729',grid:'#1e293b',text:'#94a3b8',cross:'#475569',border:'#334155',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e2e8f0',am:'dark',ag:'#1e293b',at:'#94a3b8'}:{bg:'#fff',grid:'#f1f5f9',text:'#64748b',cross:'#94a3b8',border:'#e2e8f0',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#334155',am:'light',ag:'#f1f5f9',at:'#64748b'}},
-        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.portfolio.length)this.renderPortCharts()},
+        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Overview')this.renderEarningsChart();if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(this.analysisTab==='Dividends')this.renderDividendChart()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.currentPage==='portfolio'){if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()}if(this.currentPage==='dashboard'&&this.portfolio.length)this.renderPortCharts()},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio();this.loadMovers()}if(p==='portfolio'){this.loadPortfolioAnalytics();this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()})}},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
-        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
+        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Overview')this.renderEarningsChart();if(t==='Chart')this.loadPriceChart();if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='Dividends'){this.dividendData?this.renderDividendChart():this.loadDividends(this.analysisData?.symbol)}if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
         // ── Helpers ──
         _logoDomain(s){const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();return LOGO_DOMAINS[c]||c.toLowerCase()+'.com'},
@@ -161,6 +166,13 @@ function app() {
         fmtMetric(v,f){if(v==null)return'—';if(f==='price')return this.fmtP(v);if(f==='mcap')return this.fmtBig(v);if(f==='pct')return this.fmtPct(v);if(f==='rpct')return parseFloat(v).toFixed(2)+'%';if(f==='num')return parseFloat(v).toFixed(2);if(f==='txt')return v||'—';return v},
         metricColor(v){return(!v&&v!==0)?'fg-0':parseFloat(v)>=0?'text-emerald-500':'text-red-500'},
         timeAgo(ts){if(!ts)return'';const s=(Date.now()/1000-ts);if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'})},
+        fmtRet(v){return v==null?'—':(v>=0?'+':'')+parseFloat(v).toFixed(1)+'%'},
+        retClass(v){return v==null?'fg-3':parseFloat(v)>=0?'text-emerald-500':'text-red-500'},
+        fmtUnixDate(ts){if(!ts)return'—';return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})},
+        rangePct(v,lo,hi){if(!v||!hi||hi<=lo)return 50;return Math.min(100,Math.max(0,(v-lo)/(hi-lo)*100))},
+        ratingRows(){const d=this.analystData?.distribution||{};return[{key:'strongBuy',label:'Strong Buy',count:d.strongBuy||0,color:'#10b981'},{key:'buy',label:'Buy',count:d.buy||0,color:'#34d399'},{key:'hold',label:'Hold',count:d.hold||0,color:'#f59e0b'},{key:'sell',label:'Sell',count:d.sell||0,color:'#f87171'},{key:'strongSell',label:'Strong Sell',count:d.strongSell||0,color:'#ef4444'}]},
+        hasEarningsHistory(){return(this.earningsData?.history||[]).some(h=>h.epsActual!=null)},
+        relSpy(){const a=this.portfolioAnalytics;if(!a||a.spyDayChange==null)return 0;return(a.dayChangePct||0)-a.spyDayChange},
 
         // ── API ──
         _getCacheTTL(u){
@@ -209,6 +221,7 @@ function app() {
 
         // ── Market ──
         async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
+        async loadMovers(){this.moversLoading=true;try{const m=await this.api('/api/movers');if(m&&!m.error)this.movers=m}catch(e){}this.moversLoading=false},
         edgarUrl(sym,form){return`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(sym)}&type=${encodeURIComponent(form)}&dateb=&owner=include&count=10&search_text=&action=getcompany`},
         async loadSecFilings(s){
             if(!s)return;this.secFilingsLoading=true;
@@ -224,7 +237,9 @@ function app() {
         async removeFromWatchlist(s){await this.del(`/api/watchlist/${s}`);this.clearCache('/api/watchlist');this.loadWatchlist()},
 
         // ── Portfolio ──
-        async loadPortfolio(){this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false},
+        async loadPortfolio(){this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false;if(this.portfolio.length)this.loadPortfolioAnalytics()},
+        async loadPortfolioAnalytics(){if(!this.authToken)return;this.portfolioAnalyticsLoading=true;try{const a=await this.api('/api/portfolio/analytics');if(a&&!a.error){this.portfolioAnalytics=a;if(a.sectorAllocation?.length)this.$nextTick(()=>this.renderSectorChart())}}catch(e){}this.portfolioAnalyticsLoading=false},
+        renderSectorChart(){const a=this.portfolioAnalytics;if(!a?.sectorAllocation?.length||!document.getElementById('p-sector'))return;const c=this.tc();this.renderApex('p-sector',{chart:{type:'donut',height:260,background:'transparent'},series:a.sectorAllocation.map(s=>s.value),labels:a.sectorAllocation.map(s=>s.sector),colors:['#6366f1','#06b6d4','#f59e0b','#ef4444','#10b981','#8b5cf6','#f97316','#ec4899','#64748b','#14b8a6','#a855f7'],theme:{mode:c.am},plotOptions:{pie:{donut:{size:'65%',labels:{show:true,name:{color:c.at,fontSize:'12px'},value:{color:c.at,formatter:v=>'$'+parseFloat(v).toLocaleString(undefined,{maximumFractionDigits:0})},total:{show:true,color:c.at,label:'Sectors',formatter:()=>a.sectorAllocation.length}}}}},legend:{position:'bottom',labels:{colors:c.at},fontSize:'11px'},stroke:{colors:[c.bg]},dataLabels:{enabled:false},tooltip:{theme:c.am,y:{formatter:v=>'$'+parseFloat(v).toLocaleString(undefined,{maximumFractionDigits:0})}}})},
         async addHolding(){if(!this.newHolding.symbol||!this.newHolding.shares||!this.newHolding.buy_price)return;await this.post('/api/portfolio',this.newHolding);this.newHolding={symbol:'',shares:'',buy_price:'',buy_date:'',notes:''};this.showAddHolding=false;this.clearCache('/api/portfolio');this.loadPortfolio()},
         async deleteHolding(id){await this.del(`/api/portfolio/${id}`);this.clearCache('/api/portfolio');this.loadPortfolio()},
         openEditHolding(h){this.editingHolding={id:h.id,symbol:h.symbol,shares:h.shares,buy_price:h.buy_price,buy_date:h.buy_date||'',notes:h.notes||''};this.showEditHolding=true},
@@ -249,7 +264,8 @@ function app() {
         // ── Analysis ──
         async loadAnalysis(s){
             if(!s)return;s=s.toUpperCase().trim();this.analysisSymbol=s;this.analysisLoading=true;
-            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.secFilings=null;this.analysisTab='Chart';this.peerData=null;
+            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.secFilings=null;this.analysisTab='Overview';this.peerData=null;
+            this.returnsData=null;this.valuationData=null;this.analystData=null;this.earningsData=null;this.dividendData=null;
             try{
                 const d=await this.api(`/api/quote/${s}`);this.analysisData=d;
                 this.analysisStats=[
@@ -260,13 +276,28 @@ function app() {
                     {label:'Volume',value:d.volume?d.volume.toLocaleString():'—'},{label:'Avg Vol',value:d.avgVolume?d.avgVolume.toLocaleString():'—'},
                     {label:'Profit Margin',value:d.profitMargin?(d.profitMargin*100).toFixed(1)+'%':'—'},{label:'ROE',value:d.returnOnEquity?(d.returnOnEquity*100).toFixed(1)+'%':'—'},
                 ];
-                this.$nextTick(()=>this.loadPriceChart());
+                this.api(`/api/returns/${s}`).then(r=>{if(!r.error)this.returnsData=r}).catch(()=>{});
+                this.api(`/api/valuation/${s}`).then(v=>{if(!v.error)this.valuationData=v}).catch(()=>{});
+                this.api(`/api/analysts/${s}`).then(a=>{if(!a.error)this.analystData=a}).catch(()=>{});
+                this.api(`/api/earnings/${s}`).then(e=>{if(!e.error){this.earningsData=e;if(this.analysisTab==='Overview')this.$nextTick(()=>this.renderEarningsChart())}}).catch(()=>{});
                 this.api(`/api/fundamentals/${s}`).then(f=>this.fundamentalsData=f).catch(()=>{});
                 this.api(`/api/score/${s}`).then(sc=>this.stockScore=sc).catch(()=>{});
                 this.loadPeers(s);
             }catch(e){console.error(e)}
             this.analysisLoading=false;
         },
+        async loadDividends(s){if(!s)return;this.dividendLoading=true;try{const d=await this.api(`/api/dividends/${s}`);if(!d.error){this.dividendData=d;this.$nextTick(()=>this.renderDividendChart())}}catch(e){}this.dividendLoading=false},
+        renderEarningsChart(){
+            if(!this.earningsData||!document.getElementById('eps-chart'))return;const c=this.tc();
+            const past=(this.earningsData.history||[]).filter(h=>h.epsActual!=null).slice(0,8).reverse();
+            if(!past.length){this.renderApex('eps-chart',{chart:{type:'bar',height:10,background:'transparent'},series:[],noData:{text:'No earnings history'}});return}
+            this.renderApex('eps-chart',{chart:{type:'bar',height:240,background:'transparent',toolbar:{show:false}},series:[{name:'Estimate',data:past.map(h=>h.epsEstimate)},{name:'Actual',data:past.map(h=>h.epsActual)}],xaxis:{categories:past.map(h=>h.date.slice(0,7)),labels:{style:{colors:c.at},rotate:-45}},yaxis:{labels:{style:{colors:c.at},formatter:v=>'$'+(v??0).toFixed(2)}},colors:['#94a3b8','#6366f1'],plotOptions:{bar:{borderRadius:4,columnWidth:'70%'}},grid:{borderColor:c.ag,strokeDashArray:3},theme:{mode:c.am},legend:{labels:{colors:c.at}},dataLabels:{enabled:false},tooltip:{theme:c.am,y:{formatter:v=>'$'+(v??0).toFixed(2)}}});
+        },
+        renderDividendChart(){
+            if(!this.dividendData?.history?.length||!document.getElementById('div-chart'))return;const c=this.tc(),h=this.dividendData.history;
+            this.renderApex('div-chart',{chart:{type:'bar',height:260,background:'transparent',toolbar:{show:false}},series:[{name:'Dividend / share',data:h.map(x=>x.amount)}],xaxis:{categories:h.map(x=>x.year),labels:{style:{colors:c.at}}},yaxis:{labels:{style:{colors:c.at},formatter:v=>'$'+(v??0).toFixed(2)}},colors:['#10b981'],plotOptions:{bar:{borderRadius:4,columnWidth:'60%'}},grid:{borderColor:c.ag,strokeDashArray:3},theme:{mode:c.am},legend:{show:false},dataLabels:{enabled:false},tooltip:{theme:c.am,y:{formatter:v=>'$'+(v??0).toFixed(4)}}});
+        },
+        analystDistTotal(){const d=this.analystData?.distribution;return d?(d.strongBuy+d.buy+d.hold+d.sell+d.strongSell):0},
 
         // ── Financials ──
         _finData(){if(!this.fundamentalsData)return{};const m={'income-annual':'financials','income-quarterly':'quarterlyFinancials','balance-annual':'balanceSheet','balance-quarterly':'quarterlyBalanceSheet','cashflow-annual':'cashflow','cashflow-quarterly':'quarterlyCashflow'};return this.fundamentalsData[m[`${this.finTab}-${this.finPeriod}`]]||{}},
