@@ -29,27 +29,22 @@ function app() {
 
         navItems: [
             {id:'dashboard',label:'Dashboard',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>'},
-            {id:'news',label:'News',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>'},
             {id:'analysis',label:'Analysis',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>'},
             {id:'compare',label:'Compare',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>'},
-
             {id:'portfolio',label:'Portfolio',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>'},
-            {id:'calendar',label:'Calendar',icon:'<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'},
         ],
 
         marketData:[], marketLoading:false,
         watchlist:[], watchlistLoading:false,
-        marketNews:[], newsLoading:false,
         portfolio:[], portfolioLoading:false,
         showAddHolding:false, newHolding:{symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
         showEditHolding:false, editingHolding:{id:null,symbol:'',shares:'',buy_price:'',buy_date:'',notes:''},
-        portfolioReview:null, portfolioReviewLoading:false, showPortfolioReview:false,
 
         analysisSymbol:'', analysisData:null, analysisStats:[], analysisLoading:false,
-        analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','News','SEC Filings','Profile'],
+        analysisTab:'Chart', analysisTabs:['Chart','Technicals','Fundamentals','Financials','SEC Filings','Profile'],
         chartPeriod:'1y', techPeriod:'1y',
         fundamentalsData:null, finTab:'income', finPeriod:'annual',
-        stockScore:null, stockNews:null, stockNewsLoading:false,
+        stockScore:null,
         secFilings:null, secFilingsLoading:false,
         scoreCategories:[
             {key:'profitability',label:'Profitability',desc:'Margins & ROE',weight:25},
@@ -59,13 +54,7 @@ function app() {
             {key:'momentum',label:'Momentum',desc:'Price Trends',weight:15},
         ],
 
-        chatOpen:false, chatMessages:[], chatInput:'', chatLoading:false,
-
-        calendarEvents:[], calendarLoading:false, calendarFilter:'all',
-        dividendDetail:null, dividendDetailLoading:false, showDividendDetail:false,
-
         compareInput:'', compareData:null, compareLoading:false, comparePeriod:'1y',
-        compareAiSummary:null, compareAiLoading:false, showCompareAi:false,
         cmpColors:['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4'],
         compareMetrics:[
             {key:'price',label:'Price',format:'price',hb:null},{key:'marketCap',label:'Market Cap',format:'mcap',hb:true},
@@ -79,17 +68,12 @@ function app() {
             {key:'sector',label:'Sector',format:'txt',hb:null},{key:'industry',label:'Industry',format:'txt',hb:null},
         ],
 
-        chartAiInsight:null, chartAiLoading:false,
-        fundAiSummary:null, fundAiLoading:false,
-
-        watchlistDigest:null, watchlistDigestLoading:false, showWatchlistDigest:false,
         peerData:null, peerLoading:false,
-        earningsHistory:null, earningsHistoryLoading:false, earningsHistorySymbol:'',
 
         apex:{}, tv:{},
         _apiCache:{},
-        _cacheTTLs:{'/api/market':60,'/api/market-news':180,'/api/watchlist':30,'/api/portfolio':30,'/api/earnings-calendar':120},
-        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/news/',120],['/api/sec-filings/',120],['/api/dividends/',300],['/api/compare?',60]],
+        _cacheTTLs:{'/api/market':60,'/api/watchlist':30,'/api/portfolio':30},
+        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/sec-filings/',120],['/api/peers/',300],['/api/compare?',60]],
 
         init() {
             this.applyTheme();
@@ -149,12 +133,12 @@ function app() {
         toggleTheme(){this.darkMode=!this.darkMode;this.applyTheme();localStorage.setItem('investorhub-theme',this.darkMode?'dark':'light');this.reRender()},
         applyTheme(){document.documentElement.classList.toggle('dark',this.darkMode)},
         tc(){return this.darkMode?{bg:'#0f1729',grid:'#1e293b',text:'#94a3b8',cross:'#475569',border:'#334155',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e2e8f0',am:'dark',ag:'#1e293b',at:'#94a3b8'}:{bg:'#fff',grid:'#f1f5f9',text:'#64748b',cross:'#94a3b8',border:'#e2e8f0',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#334155',am:'light',ag:'#f1f5f9',at:'#64748b'}},
-        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.portfolio.length)this.renderPortCharts();if(this.earningsHistory)this.$nextTick(()=>this.renderEarningsChart())},
+        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.portfolio.length)this.renderPortCharts()},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='news')this.loadMarketNews();if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()});if(p==='calendar')this.loadCalendar()},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio()}if(p==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
-        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='News'&&!this.stockNews)this.loadStockNews(this.analysisData?.symbol);if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
+        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
 
         // ── Helpers ──
         _logoDomain(s){const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();return LOGO_DOMAINS[c]||c.toLowerCase()+'.com'},
@@ -215,8 +199,6 @@ function app() {
 
         // ── Market ──
         async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
-        async loadMarketNews(){this.newsLoading=true;try{const d=await this.api('/api/market-news');this.marketNews=d.news||[]}catch(e){}this.newsLoading=false},
-        async loadStockNews(s){if(!s)return;this.stockNewsLoading=true;try{this.stockNews=await this.api(`/api/news/${s}`)}catch(e){}this.stockNewsLoading=false},
         edgarUrl(sym,form){return`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(sym)}&type=${encodeURIComponent(form)}&dateb=&owner=include&count=10&search_text=&action=getcompany`},
         async loadSecFilings(s){
             if(!s)return;this.secFilingsLoading=true;
@@ -237,15 +219,6 @@ function app() {
         async deleteHolding(id){await this.del(`/api/portfolio/${id}`);this.clearCache('/api/portfolio');this.loadPortfolio()},
         openEditHolding(h){this.editingHolding={id:h.id,symbol:h.symbol,shares:h.shares,buy_price:h.buy_price,buy_date:h.buy_date||'',notes:h.notes||''};this.showEditHolding=true},
         async saveEditHolding(){if(!this.editingHolding.id)return;await this.put(`/api/portfolio/${this.editingHolding.id}`,{shares:parseFloat(this.editingHolding.shares),buy_price:parseFloat(this.editingHolding.buy_price),buy_date:this.editingHolding.buy_date,notes:this.editingHolding.notes});this.showEditHolding=false;this.clearCache('/api/portfolio');this.loadPortfolio()},
-        async analyzePortfolio(){
-            if(!this.portfolio.length||this.portfolioReviewLoading)return;
-            this.portfolioReviewLoading=true;this.showPortfolioReview=true;this.portfolioReview=null;
-            const tv=this.ptv();
-            const lines=this.portfolio.map(h=>{const v=(h.currentPrice||0)*h.shares;const pct=tv?(v/tv*100).toFixed(1):0;return`${h.symbol}: ${h.shares} shares @ $${h.buy_price} (now $${(h.currentPrice||0).toFixed(2)}), value $${v.toFixed(2)} (${pct}%), P&L $${this.hpl(h).toFixed(2)} (${this.hret(h).toFixed(1)}%)`});
-            const ctx=[`Total Value: $${tv.toFixed(2)}`,`Total Cost: $${this.ptc().toFixed(2)}`,`Total P&L: $${this.ptp().toFixed(2)} (${this.ptr().toFixed(1)}%)`,`Holdings (${this.portfolio.length}):`,...lines].join('\n');
-            try{const r=await this.post('/api/chat/portfolio',{portfolio_context:ctx});this.portfolioReview=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.portfolioReview='Connection error. Please try again.'}
-            this.portfolioReviewLoading=false;
-        },
         hpl(h){return((h.currentPrice||0)-h.buy_price)*h.shares},
         hret(h){return h.buy_price?(((h.currentPrice||0)-h.buy_price)/h.buy_price)*100:0},
         ptv(){return this.portfolio.reduce((s,h)=>s+(h.currentPrice||0)*h.shares,0)},
@@ -266,7 +239,7 @@ function app() {
         // ── Analysis ──
         async loadAnalysis(s){
             if(!s)return;s=s.toUpperCase().trim();this.analysisSymbol=s;this.analysisLoading=true;
-            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.stockNews=null;this.secFilings=null;this.analysisTab='Chart';this.chartAiInsight=null;this.fundAiSummary=null;this.peerData=null;
+            this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.secFilings=null;this.analysisTab='Chart';this.peerData=null;
             try{
                 const d=await this.api(`/api/quote/${s}`);this.analysisData=d;
                 this.analysisStats=[
@@ -331,7 +304,7 @@ function app() {
         },
 
         // ── Compare ──
-        async loadCompare(){if(!this.compareInput)return;this.compareLoading=true;this.compareAiSummary=null;this.showCompareAi=false;try{this.compareData=await this.api(`/api/compare?symbols=${this.compareInput.toUpperCase().replace(/\s/g,'')}&period=${this.comparePeriod}`);this.$nextTick(()=>{this.renderCmpChart();this.renderCmpRadar()})}catch(e){}this.compareLoading=false},
+        async loadCompare(){if(!this.compareInput)return;this.compareLoading=true;try{this.compareData=await this.api(`/api/compare?symbols=${this.compareInput.toUpperCase().replace(/\s/g,'')}&period=${this.comparePeriod}`);this.$nextTick(()=>{this.renderCmpChart();this.renderCmpRadar()})}catch(e){}this.compareLoading=false},
         renderCmpChart(){if(!this.compareData)return;const ch=this.mkTv('tv-cmp',380);if(!ch)return;Object.keys(this.compareData).forEach((s,i)=>{const p=this.compareData[s]?.prices||[];if(!p.length)return;ch.addLineSeries({color:this.cmpColors[i%5],lineWidth:2,title:s,priceFormat:{type:'custom',formatter:v=>v.toFixed(1)}}).setData(p.map(r=>({time:r.date,value:r.normalized})))});ch.timeScale().fitContent()},
         renderCmpRadar(){
             if(!this.compareData)return;const c=this.tc(),syms=Object.keys(this.compareData);
@@ -352,70 +325,12 @@ function app() {
             if(m.hb){return v===mx?'text-emerald-500 font-bold':v===mn?'text-red-400':'fg-0'}
             return v===mn?'text-emerald-500 font-bold':v===mx?'text-red-400':'fg-0';
         },
-        async analyzeComparison(){
-            if(!this.compareData||this.compareAiLoading)return;
-            this.compareAiLoading=true;this.showCompareAi=true;this.compareAiSummary=null;
-            const syms=Object.keys(this.compareData);
-            const lines=syms.map(s=>{const d=this.compareData[s];return`${s}: Price $${d.price?.toFixed(2)}, MCap ${this.fmtBig(d.marketCap)}, P/E ${d.peRatio?.toFixed(1)||'N/A'}, Fwd P/E ${d.forwardPE?.toFixed(1)||'N/A'}, EPS $${d.eps?.toFixed(2)||'N/A'}, Div Yield ${d.dividendYield?(d.dividendYield*100).toFixed(2)+'%':'N/A'}, Beta ${d.beta?.toFixed(2)||'N/A'}, Profit Margin ${d.profitMargin?(d.profitMargin*100).toFixed(1)+'%':'N/A'}, ROE ${d.returnOnEquity?(d.returnOnEquity*100).toFixed(1)+'%':'N/A'}, Rev Growth ${d.revenueGrowth?(d.revenueGrowth*100).toFixed(1)+'%':'N/A'}, Earn Growth ${d.earningsGrowth?(d.earningsGrowth*100).toFixed(1)+'%':'N/A'}, D/E ${d.debtToEquity?.toFixed(1)||'N/A'}, Sector: ${d.sector||'N/A'}`});
-            const ctx=`Compare these stocks side by side:\n\n${lines.join('\n')}`;
-            try{const r=await this.post('/api/chat/compare',{comparison_context:ctx});this.compareAiSummary=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.compareAiSummary='Connection error. Please try again.'}
-            this.compareAiLoading=false;
-        },
-        async getChartInsight(){
-            if(!this.analysisData||this.chartAiLoading)return;
-            this.chartAiLoading=true;this.chartAiInsight=null;
-            const s=this.analysisData.symbol;
-            try{
-                const t=await this.api(`/api/technicals/${s}?period=${this.chartPeriod}`);
-                if(!t||!t.length){this.chartAiInsight='No technical data available.';this.chartAiLoading=false;return}
-                const last=t[t.length-1];
-                const ctx=`Stock: ${s} (${this.analysisData.name})\nCurrent Price: $${this.analysisData.price?.toFixed(2)}\nPeriod: ${this.chartPeriod}\n\nLatest Technical Indicators:\n- SMA20: ${last.SMA20?.toFixed(2)||'N/A'}\n- SMA50: ${last.SMA50?.toFixed(2)||'N/A'}\n- RSI(14): ${last.RSI?.toFixed(1)||'N/A'}\n- MACD: ${last.MACD?.toFixed(3)||'N/A'}\n- MACD Signal: ${last.Signal?.toFixed(3)||'N/A'}\n- MACD Histogram: ${last.MACD_Hist?.toFixed(3)||'N/A'}\n- Bollinger Upper: ${last.BB_Upper?.toFixed(2)||'N/A'}\n- Bollinger Lower: ${last.BB_Lower?.toFixed(2)||'N/A'}\n- Close: ${last.Close?.toFixed(2)||'N/A'}\n\nPrice vs SMA20: ${last.Close>last.SMA20?'Above':'Below'}\nPrice vs SMA50: ${last.Close>last.SMA50?'Above':'Below'}\nSMA20 vs SMA50: ${last.SMA20>last.SMA50?'Bullish crossover':'Bearish crossover'}`;
-                const r=await this.post('/api/chat/chart-insight',{chart_context:ctx});this.chartAiInsight=r.reply||r.error||'Unable to generate insight.';
-            }catch(e){this.chartAiInsight='Connection error. Please try again.'}
-            this.chartAiLoading=false;
-        },
-        async getFundamentalsSummary(){
-            if(!this.fundamentalsData||!this.analysisData||this.fundAiLoading)return;
-            this.fundAiLoading=true;this.fundAiSummary=null;
-            const fd=this.fundamentalsData,s=this.analysisData.symbol;
-            const fk=Object.keys(fd.financials||{}).sort(),ck=Object.keys(fd.cashflow||{}).sort(),bk=Object.keys(fd.balanceSheet||{}).sort();
-            let ctx=`Stock: ${s} (${this.analysisData.name})\nSector: ${this.analysisData.sector}\nPrice: $${this.analysisData.price?.toFixed(2)}\n\n`;
-            if(fk.length){ctx+='Income Statement (annual, $M):\n';for(const d of fk.slice(-4)){const r=fd.financials[d];ctx+=`${d.substring(0,4)}: Revenue ${Math.round((r?.['Total Revenue']||0)/1e6)}, Net Income ${Math.round((r?.['Net Income']||0)/1e6)}, Gross Profit ${Math.round((r?.['Gross Profit']||0)/1e6)}, Operating Income ${Math.round((r?.['Operating Income']||0)/1e6)}\n`}}
-            if(ck.length){ctx+='\nCash Flow (annual, $M):\n';for(const d of ck.slice(-4)){const r=fd.cashflow[d];ctx+=`${d.substring(0,4)}: Op CF ${Math.round((r?.['Operating Cash Flow']||0)/1e6)}, CapEx ${Math.round((r?.['Capital Expenditure']||0)/1e6)}, FCF ${Math.round(((r?.['Operating Cash Flow']||0)+(r?.['Capital Expenditure']||0))/1e6)}\n`}}
-            if(bk.length){ctx+='\nBalance Sheet (latest, $M):\n';const r=fd.balanceSheet[bk[bk.length-1]];ctx+=`Total Assets ${Math.round((r?.['Total Assets']||0)/1e6)}, Total Liabilities ${Math.round((r?.['Total Liabilities Net Minority Interest']||0)/1e6)}, Cash ${Math.round((r?.['Cash And Cash Equivalents']||0)/1e6)}, Total Debt ${Math.round((r?.['Total Debt']||0)/1e6)}, Equity ${Math.round((r?.['Stockholders Equity']||0)/1e6)}\n`}
-            try{const r=await this.post('/api/chat/fundamentals',{fundamentals_context:ctx});this.fundAiSummary=r.reply||r.error||'Unable to generate analysis.'}catch(e){this.fundAiSummary='Connection error. Please try again.'}
-            this.fundAiLoading=false;
-        },
-
-        // ── AI Watchlist Digest ──
-        async getWatchlistDigest(){
-            if(!this.watchlist.length||this.watchlistDigestLoading)return;
-            this.watchlistDigestLoading=true;this.showWatchlistDigest=true;this.watchlistDigest=null;
-            const lines=this.watchlist.map(w=>`${w.symbol} (${w.name||''}): $${(w.price||0).toFixed(2)}, ${w.changePercent>=0?'+':''}${(w.changePercent||0).toFixed(2)}%`);
-            const ctx=`My watchlist today:\n\n${lines.join('\n')}`;
-            try{const r=await this.post('/api/chat/watchlist-digest',{watchlist_context:ctx});this.watchlistDigest=r.reply||r.error||'Unable to generate digest.'}catch(e){this.watchlistDigest='Connection error. Please try again.'}
-            this.watchlistDigestLoading=false;
-        },
 
         // ── Peer Comparison ──
         async loadPeers(s){
             if(!s)return;this.peerLoading=true;this.peerData=null;
             try{this.peerData=await this.api(`/api/peers/${s}`)}catch(e){}
             this.peerLoading=false;
-        },
-
-        // ── Earnings Surprise Tracker ──
-        async loadEarningsHistory(s){
-            if(!s)return;this.earningsHistoryLoading=true;this.earningsHistorySymbol=s;this.earningsHistory=null;
-            try{const d=await this.api(`/api/earnings-history/${s}`);this.earningsHistory=d.history||[];this.$nextTick(()=>this.renderEarningsChart())}catch(e){this.earningsHistory=[]}
-            this.earningsHistoryLoading=false;
-        },
-        renderEarningsChart(){
-            if(!this.earningsHistory||!this.earningsHistory.length)return;
-            const c=this.tc(),h=this.earningsHistory.filter(e=>e.epsEstimate!=null&&e.epsActual!=null).reverse();
-            if(!h.length)return;
-            const dates=h.map(e=>e.date.substring(0,7)),est=h.map(e=>e.epsEstimate),act=h.map(e=>e.epsActual);
-            this.renderApex('earnings-surprise',{chart:{type:'bar',height:280,background:'transparent',toolbar:{show:false}},series:[{name:'Estimate',data:est},{name:'Actual',data:act}],xaxis:{categories:dates,labels:{style:{colors:c.at,fontSize:'10px'}}},yaxis:{labels:{style:{colors:c.at},formatter:v=>'$'+v.toFixed(2)}},colors:['#64748b','#6366f1'],plotOptions:{bar:{borderRadius:4,columnWidth:'55%',dataLabels:{position:'top'}}},dataLabels:{enabled:true,formatter:v=>'$'+v.toFixed(2),style:{fontSize:'9px',colors:[c.at]},offsetY:-18},grid:{borderColor:c.ag,strokeDashArray:3},theme:{mode:c.am},legend:{labels:{colors:c.at},position:'top'},tooltip:{theme:c.am,y:{formatter:v=>'$'+v.toFixed(2)}},annotations:{points:h.map((e,i)=>e.beat!=null?{x:dates[i],y:e.epsActual,seriesIndex:1,marker:{size:0},label:{text:e.beat?'BEAT':'MISS',borderColor:e.beat?'#10b981':'#ef4444',style:{background:e.beat?'#10b981':'#ef4444',color:'#fff',fontSize:'8px',padding:{left:3,right:3,top:1,bottom:1}},offsetY:-8}}:null).filter(Boolean)}});
         },
 
         // ── Export CSV ──
@@ -442,57 +357,11 @@ function app() {
             const d=this.analysisData;
             const rows=[['Stock Analysis Export'],[],['Symbol',d.symbol],['Name',d.name],['Price',d.price],['Change',d.change],['Change %',d.changePercent],[],['Key Stats']];
             for(const s of this.analysisStats){rows.push([s.label,s.value])}
-            if(this.stockScore){rows.push([]);rows.push(['AI Health Score']);rows.push(['Overall',this.stockScore.overallScore]);rows.push(['Rating',this.stockScore.rating]);for(const cat of this.scoreCategories){if(this.stockScore.scores?.[cat.key]!=null)rows.push([cat.label,this.stockScore.scores[cat.key]])}}
+            if(this.stockScore){rows.push([]);rows.push(['Health Score']);rows.push(['Overall',this.stockScore.overallScore]);rows.push(['Rating',this.stockScore.rating]);for(const cat of this.scoreCategories){if(this.stockScore.scores?.[cat.key]!=null)rows.push([cat.label,this.stockScore.scores[cat.key]])}}
             this._downloadCSV('analysis_'+d.symbol+'_'+new Date().toISOString().split('T')[0]+'.csv',rows);
-        },
-
-        // ── Streaming AI Chat ──
-        async sendChatStreaming(){
-            const msg=this.chatInput.trim();if(!msg||this.chatLoading)return;
-            this.chatMessages.push({role:'user',content:msg});this.chatInput='';this.chatLoading=true;
-            this.$nextTick(()=>this.scrollChat());
-            this.chatMessages.push({role:'assistant',content:''});
-            const aiIdx=this.chatMessages.length-1;
-            try{
-                const resp=await fetch(API_BASE+'/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json',...this.authH()},body:JSON.stringify({messages:this.chatMessages.slice(0,-1).filter(m=>m.content)})});
-                if(!resp.ok){this.chatMessages[aiIdx].content='Sorry, I couldn\'t process that.';this.chatLoading=false;return}
-                const reader=resp.body.getReader();const decoder=new TextDecoder();let buf='';
-                while(true){
-                    const{done,value}=await reader.read();if(done)break;
-                    buf+=decoder.decode(value,{stream:true});
-                    const lines=buf.split('\n');buf=lines.pop()||'';
-                    for(const line of lines){
-                        if(!line.startsWith('data: '))continue;
-                        const payload=line.slice(6).trim();
-                        if(payload==='[DONE]')break;
-                        try{const d=JSON.parse(payload);if(d.content){this.chatMessages[aiIdx].content+=d.content;this.$nextTick(()=>this.scrollChat())}}catch(e){}
-                    }
-                }
-                if(!this.chatMessages[aiIdx].content)this.chatMessages[aiIdx].content='Sorry, I couldn\'t process that.';
-            }catch(e){this.chatMessages[aiIdx].content='Connection error. Please try again.'}
-            this.chatLoading=false;this.$nextTick(()=>this.scrollChat());
         },
 
         // ── Apex ──
         renderApex(id,opts){if(typeof ApexCharts==='undefined')return;if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
-
-        // ── Calendar ──
-        async loadCalendar(){this.calendarLoading=true;try{const d=await this.api('/api/earnings-calendar');this.calendarEvents=d.events||[]}catch(e){this.calendarEvents=[]}this.calendarLoading=false},
-        filteredCalendarEvents(){if(this.calendarFilter==='all')return this.calendarEvents;return this.calendarEvents.filter(e=>e.type===this.calendarFilter)},
-        async loadDividendDetail(symbol){this.dividendDetailLoading=true;this.showDividendDetail=true;this.dividendDetail=null;try{this.dividendDetail=await this.api(`/api/dividends/${symbol}`)}catch(e){}this.dividendDetailLoading=false},
-        calendarDateLabel(ds){const d=new Date(ds+'T00:00:00'),t=new Date();t.setHours(0,0,0,0);const diff=Math.ceil((d-t)/86400000);if(diff===0)return'Today';if(diff===1)return'Tomorrow';if(diff<=7)return d.toLocaleDateString('en-US',{weekday:'short'});return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})},
-
-        // ── AI Chat ──
-        toggleChat(){this.chatOpen=!this.chatOpen;if(this.chatOpen)this.$nextTick(()=>{const el=document.getElementById('chat-input');if(el)el.focus()})},
-        async sendChat(){return this.sendChatStreaming()},
-        scrollChat(){const el=document.getElementById('chat-body');if(el)el.scrollTop=el.scrollHeight},
-        fmtChat(text){
-            if(!text)return'';
-            return text
-                .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g,'<em>$1</em>')
-                .replace(/`(.+?)`/g,'<code class="text-brand-400 bg-[var(--bg-2)] px-1 rounded text-[12px]">$1</code>')
-                .replace(/\n/g,'<br>');
-        },
     };
 }

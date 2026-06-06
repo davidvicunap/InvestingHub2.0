@@ -135,7 +135,7 @@
                     <h1 class="text-2xl font-bold fg-0 tracking-tight">InvestorHub</h1>
                 </div>
             </div>
-            <h2 class="text-xl md:text-2xl font-bold fg-0 mb-3 leading-tight">Your AI-powered<br>investment research desk</h2>
+            <h2 class="text-xl md:text-2xl font-bold fg-0 mb-3 leading-tight">Your stock<br>research desk</h2>
             <p class="text-sm fg-2 mb-6 leading-relaxed">Free, open-source stock analytics with institutional-grade tools. No paywall, no upsells — just deep analysis.</p>
 
             <!-- Backend status indicator -->
@@ -151,10 +151,10 @@
             <div class="grid grid-cols-2 gap-3 text-left">
                 <div class="bg-inset rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                        <span class="text-[11px] font-bold fg-0">TA Chatbot</span>
+                        <svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span class="text-[11px] font-bold fg-0">Interactive Charts</span>
                     </div>
-                    <p class="text-[10px] fg-3 leading-snug">NYIF-trained AI teaches technical analysis concepts with real examples</p>
+                    <p class="text-[10px] fg-3 leading-snug">Candlestick price charts plus RSI, MACD, moving averages & Bollinger Bands</p>
                 </div>
                 <div class="bg-inset rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1.5">
@@ -165,10 +165,10 @@
                 </div>
                 <div class="bg-inset rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                        <span class="text-[11px] font-bold fg-0">AI TA Assistant</span>
+                        <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                        <span class="text-[11px] font-bold fg-0">Stock Compare</span>
                     </div>
-                    <p class="text-[10px] fg-3 leading-snug">Technical analysis teacher trained in NYIF curriculum — indicators, patterns & strategies</p>
+                    <p class="text-[10px] fg-3 leading-snug">Compare up to 5 stocks side by side with metrics tables & a strengths radar</p>
                 </div>
                 <div class="bg-inset rounded-xl p-3">
                     <div class="flex items-center gap-2 mb-1.5">
@@ -178,7 +178,7 @@
                     <p class="text-[10px] fg-3 leading-snug">Direct EDGAR integration — 10-K, 10-Q, 8-K filings with one click</p>
                 </div>
             </div>
-            <p class="text-[10px] fg-3 mt-4 hidden md:block">Also: sentiment analysis, earnings surprise tracker, dividends calendar, AI portfolio review, stock comparison with radar charts, full financials, and more.</p>
+            <p class="text-[10px] fg-3 mt-4 hidden md:block">Also: full financial statements, fundamentals charts, sector peers, portfolio tracking with P&L, watchlist, CSV export, and more.</p>
         </div>
 
         <!-- Right: Auth Forms -->
@@ -326,29 +326,6 @@
                 </template>
             </div>
         </div>
-        <!-- AI Watchlist Digest -->
-        <div x-show="watchlist.length" x-cloak class="mb-5">
-            <div class="card p-5">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        </div>
-                        <span class="text-[13px] font-bold fg-0">AI Market Brief</span>
-                        <span class="text-[10px] fg-3 bg-inset px-2 py-0.5 rounded-md">Your watchlist</span>
-                    </div>
-                    <button @click="getWatchlistDigest()" :disabled="watchlistDigestLoading" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition" :class="watchlistDigestLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
-                        <svg x-show="watchlistDigestLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        <span x-text="watchlistDigestLoading?'Analyzing...':watchlistDigest?'Refresh':'Get Brief'"></span>
-                    </button>
-                </div>
-                <div x-show="showWatchlistDigest" x-cloak>
-                    <div x-show="watchlistDigestLoading&&!watchlistDigest" class="space-y-2 py-3"><div class="skel h-3 w-3/4"></div><div class="skel h-3 w-full"></div><div class="skel h-3 w-5/6"></div><div class="skel h-3 w-2/3"></div></div>
-                    <div x-show="watchlistDigest" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(watchlistDigest)"></div>
-                </div>
-                <p x-show="!showWatchlistDigest" class="text-[12px] fg-3">Get an AI-powered summary of your watchlist movers, key levels, and what to watch.</p>
-            </div>
-        </div>
         <!-- Watchlist + Portfolio -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <!-- Watchlist -->
@@ -405,47 +382,10 @@
         </div>
     </div>
 
-    <!-- ───────── NEWS ───────── -->
-    <div x-show="currentPage==='news'" x-cloak class="fade">
-        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Market News</h2>
-        <p class="text-[13px] fg-2 mb-6">Headlines with AI sentiment analysis</p>
-        <div x-show="newsLoading" class="space-y-3"><template x-for="i in 5"><div class="skel h-24"></div></template></div>
-        <div x-show="!newsLoading">
-            <!-- sentiment bar -->
-            <div class="grid grid-cols-3 gap-3 mb-5" x-show="marketNews.length">
-                <div class="card p-3 text-center"><div class="text-xl font-bold text-emerald-500" x-text="marketNews.filter(n=>n.sentiment?.label==='positive').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Bullish</div></div>
-                <div class="card p-3 text-center"><div class="text-xl font-bold fg-2" x-text="marketNews.filter(n=>n.sentiment?.label==='neutral').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Neutral</div></div>
-                <div class="card p-3 text-center"><div class="text-xl font-bold text-red-500" x-text="marketNews.filter(n=>n.sentiment?.label==='negative').length"></div><div class="text-[10px] fg-3 mt-0.5 font-semibold uppercase">Bearish</div></div>
-            </div>
-            <div class="space-y-2.5">
-                <template x-for="(a,i) in marketNews" :key="i">
-                    <a :href="a.link" target="_blank" rel="noopener" class="card card-h p-4 flex gap-4 items-start block">
-                        <div x-show="a.thumbnail" x-data="{ok:true}" class="flex-shrink-0"><img x-show="ok" :src="a.thumbnail" @error="ok=false" class="w-24 h-16 rounded-lg object-cover" loading="lazy"></div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-start justify-between gap-3">
-                                <h4 class="text-[13px] font-semibold fg-0 leading-snug line-clamp-2" x-text="a.title"></h4>
-                                <span class="sent flex-shrink-0" :class="a.sentiment?.label==='positive'?'sent-pos':a.sentiment?.label==='negative'?'sent-neg':'sent-neu'" x-text="a.sentiment?.label"></span>
-                            </div>
-                            <div class="flex items-center gap-3 mt-2 text-[11px] fg-3">
-                                <span x-text="a.publisher"></span>
-                                <span x-text="timeAgo(a.publishedAt)"></span>
-                            </div>
-                        </div>
-                    </a>
-                </template>
-            </div>
-            <div x-show="!marketNews.length&&!newsLoading" class="text-center py-16">
-                <svg class="w-12 h-12 fg-3 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
-                <p class="text-sm fg-3 mb-2">No news available right now</p>
-                <button @click="loadMarketNews()" class="text-xs text-brand-400 font-medium hover:text-brand-300">Try again</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ───────── ANALYSIS ───────── -->
     <div x-show="currentPage==='analysis'" x-cloak class="fade">
         <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Stock Analysis</h2>
-        <p class="text-[13px] fg-2 mb-5">Fundamentals, technicals, AI scoring & financials</p>
+        <p class="text-[13px] fg-2 mb-5">Fundamentals, technicals, health score & financials</p>
 
         <div class="flex items-center gap-3 mb-6">
             <input type="text" x-model="analysisSymbol" @keydown.enter="loadAnalysis(analysisSymbol)" placeholder="Ticker e.g. AAPL" class="px-4 py-2.5 rounded-[10px] text-sm input-f w-44 uppercase" style="text-transform:uppercase">
@@ -493,7 +433,7 @@
                         <div class="w-7 h-7 rounded-lg bg-brand-500/15 flex items-center justify-center">
                             <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                         </div>
-                        <span class="text-[14px] font-bold fg-0">AI Health Score</span>
+                        <span class="text-[14px] font-bold fg-0">Health Score</span>
                     </div>
                     <span class="text-[11px] px-3 py-1 rounded-lg font-bold tracking-wide" :class="{'bg-emerald-500/15 text-emerald-400':stockScore?.rating==='Strong Buy'||stockScore?.rating==='Buy','bg-amber-500/15 text-amber-400':stockScore?.rating==='Hold','bg-red-500/15 text-red-400':stockScore?.rating==='Sell'||stockScore?.rating==='Strong Sell'}" x-text="stockScore?.rating"></span>
                 </div>
@@ -602,24 +542,6 @@
                     </div>
                     <div id="tv-price" style="height:400px"></div>
                 </div>
-                <!-- AI Chart Insight -->
-                <div class="card p-5">
-                    <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                            <div class="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
-                                <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            </div>
-                            <span class="text-[13px] font-semibold fg-0">AI Chart Insight</span>
-                        </div>
-                        <button @click="getChartInsight()" :disabled="chartAiLoading" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition" :class="chartAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
-                            <svg x-show="chartAiLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                            <span x-text="chartAiLoading?'Reading chart...':'Get AI Read'"></span>
-                        </button>
-                    </div>
-                    <div x-show="chartAiLoading&&!chartAiInsight" class="space-y-2 py-2"><div class="skel h-3 w-3/4"></div><div class="skel h-3 w-full"></div><div class="skel h-3 w-5/6"></div></div>
-                    <div x-show="chartAiInsight" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(chartAiInsight)"></div>
-                    <p x-show="!chartAiInsight&&!chartAiLoading" class="text-[12px] fg-3">Click "Get AI Read" for an AI-powered technical analysis of the current chart.</p>
-                </div>
             </div>
 
             <!-- Technicals -->
@@ -642,24 +564,6 @@
                 <div x-show="!fundamentalsData" class="flex justify-center py-8"><div class="spinner"></div></div>
                 <template x-if="fundamentalsData">
                     <div class="space-y-4">
-                        <!-- AI Fundamentals Summary -->
-                        <div class="card p-5">
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
-                                        <svg class="w-3.5 h-3.5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                                    </div>
-                                    <span class="text-[13px] font-semibold fg-0">AI Fundamentals Summary</span>
-                                </div>
-                                <button @click="getFundamentalsSummary()" :disabled="fundAiLoading" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition" :class="fundAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
-                                    <svg x-show="fundAiLoading" class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                                    <span x-text="fundAiLoading?'Analyzing...':'Summarize with AI'"></span>
-                                </button>
-                            </div>
-                            <div x-show="fundAiLoading&&!fundAiSummary" class="space-y-2 py-2"><div class="skel h-3 w-3/4"></div><div class="skel h-3 w-full"></div><div class="skel h-3 w-5/6"></div></div>
-                            <div x-show="fundAiSummary" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(fundAiSummary)"></div>
-                            <p x-show="!fundAiSummary&&!fundAiLoading" class="text-[12px] fg-3">Click "Summarize with AI" for a narrative breakdown of this company's financials.</p>
-                        </div>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Revenue & Net Income</div><div id="f-rev" style="min-height:280px"></div></div>
                             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Margins</div><div id="f-margin" style="min-height:280px"></div></div>
@@ -694,28 +598,6 @@
                         </div>
                     </div>
                 </template>
-            </div>
-
-            <!-- News -->
-            <div x-show="analysisTab==='News'" class="fade">
-                <div x-show="stockNewsLoading" class="space-y-3"><template x-for="i in 4"><div class="skel h-20"></div></template></div>
-                <div x-show="!stockNewsLoading&&stockNews">
-                    <div class="card p-4 mb-4 flex items-center justify-between">
-                        <span class="text-[13px] fg-0 font-medium">Avg Sentiment</span>
-                        <div class="flex items-center gap-2">
-                            <div class="w-28 h-1.5 rounded-full bg-inset overflow-hidden"><div class="h-full rounded-full" :class="stockNews?.averageSentiment>=.05?'bg-emerald-500':stockNews?.averageSentiment<=-.05?'bg-red-500':'bg-gray-500'" :style="'width:'+((stockNews?.averageSentiment+1)/2*100)+'%'"></div></div>
-                            <span class="text-[13px] font-bold tabular-nums" :class="stockNews?.averageSentiment>=.05?'text-emerald-500':stockNews?.averageSentiment<=-.05?'text-red-500':'fg-2'" x-text="(stockNews?.averageSentiment>=0?'+':'')+stockNews?.averageSentiment?.toFixed(3)"></span>
-                        </div>
-                    </div>
-                    <div class="space-y-2">
-                        <template x-for="(a,i) in stockNews?.news||[]" :key="i">
-                            <a :href="a.link" target="_blank" rel="noopener" class="card card-h p-4 flex gap-3 items-start block">
-                                <div class="flex-1 min-w-0"><h4 class="text-[13px] font-semibold fg-0 line-clamp-2" x-text="a.title"></h4><div class="flex items-center gap-3 mt-1.5 text-[11px] fg-3"><span x-text="a.publisher"></span><span x-text="timeAgo(a.publishedAt)"></span></div></div>
-                                <span class="sent flex-shrink-0" :class="a.sentiment?.label==='positive'?'sent-pos':a.sentiment?.label==='negative'?'sent-neg':'sent-neu'" x-text="a.sentiment?.label"></span>
-                            </a>
-                        </template>
-                    </div>
-                </div>
             </div>
 
             <!-- SEC Filings -->
@@ -842,7 +724,7 @@
     <!-- ───────── COMPARE ───────── -->
     <div x-show="currentPage==='compare'" x-cloak class="fade">
         <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Compare</h2>
-        <p class="text-[13px] fg-2 mb-5">Side-by-side up to 5 stocks with AI analysis</p>
+        <p class="text-[13px] fg-2 mb-5">Side-by-side comparison of up to 5 stocks</p>
         <div class="card p-5 mb-5">
             <div class="flex flex-wrap items-end gap-3">
                 <div class="flex-1 min-w-[180px]"><label class="text-[11px] fg-3 font-medium block mb-1">Tickers</label><input type="text" x-model="compareInput" @keydown.enter="loadCompare()" placeholder="AAPL, MSFT, GOOGL" class="w-full px-4 py-2.5 rounded-[10px] text-sm input-f"></div>
@@ -861,26 +743,6 @@
                 <div class="card p-5">
                     <div class="text-[13px] font-semibold fg-0 mb-3">Strengths Radar</div>
                     <div id="cmp-radar" style="min-height:340px"></div>
-                </div>
-            </div>
-            <!-- AI Comparison Summary -->
-            <div class="card p-5 mb-5">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500/20 to-violet-500/20 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        </div>
-                        <span class="text-[14px] font-bold fg-0">AI Comparison</span>
-                    </div>
-                    <button @click="analyzeComparison()" :disabled="compareAiLoading" class="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-semibold transition" :class="compareAiLoading?'bg-[var(--bg-2)] fg-3 cursor-wait':'bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/25'">
-                        <svg x-show="compareAiLoading" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                        <svg x-show="!compareAiLoading" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        <span x-text="compareAiLoading?'Analyzing...':'Analyze with AI'"></span>
-                    </button>
-                </div>
-                <div x-show="showCompareAi" x-cloak>
-                    <div x-show="compareAiLoading&&!compareAiSummary" class="space-y-2 py-4"><div class="skel h-4 w-3/4"></div><div class="skel h-4 w-full"></div><div class="skel h-4 w-5/6"></div><div class="skel h-4 w-2/3"></div></div>
-                    <div x-show="compareAiSummary" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(compareAiSummary)"></div>
                 </div>
             </div>
             <!-- Comparison Table -->
@@ -911,7 +773,6 @@
             <div class="flex items-center gap-2">
                 <button @click="exportPortfolioCSV()" x-show="portfolio.length" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
 
-                <button @click="analyzePortfolio()" x-show="portfolio.length" class="px-4 py-2.5 bg-gradient-to-r from-brand-500 to-violet-600 text-white rounded-[10px] text-sm font-semibold hover:opacity-90 transition shadow-sm flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>AI Review</button>
                 <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
             </div>
         </div>
@@ -948,133 +809,10 @@
                 </table>
             </div>
         </div>
-        <!-- AI Portfolio Review Panel -->
-        <div x-show="showPortfolioReview" x-cloak class="card mt-5 p-5 fade">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 bg-gradient-to-br from-brand-500 to-violet-600 rounded-lg flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div>
-                    <span class="text-[13px] font-semibold fg-0">AI Portfolio Analysis</span>
-                </div>
-                <button @click="showPortfolioReview=false" class="fg-3 hover:fg-1 transition"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-            </div>
-            <div x-show="portfolioReviewLoading" class="flex items-center gap-3 py-4"><div class="spinner"></div><span class="text-sm fg-2">Analyzing your portfolio...</span></div>
-            <div x-show="!portfolioReviewLoading && portfolioReview" class="text-[13px] fg-1 leading-relaxed ai-prose" x-html="fmtChat(portfolioReview)"></div>
-            <div class="text-[9px] fg-3 mt-3 text-center">Educational only — not financial advice</div>
-        </div>
-    </div>
-
-    <!-- ───────── CALENDAR ───────── -->
-    <div x-show="currentPage==='calendar'" x-cloak class="fade">
-        <div class="flex items-center justify-between mb-5">
-            <div><h2 class="text-xl md:text-2xl font-bold fg-0">Events Calendar</h2><p class="text-[13px] fg-2 mt-0.5">Upcoming earnings & dividends for your stocks</p></div>
-            <button @click="loadCalendar()" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Refresh</button>
-        </div>
-        <!-- Filters -->
-        <div class="flex gap-2 mb-5">
-            <button @click="calendarFilter='all'" :class="calendarFilter==='all'?'bg-brand-600 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">All</button>
-            <button @click="calendarFilter='earnings'" :class="calendarFilter==='earnings'?'bg-amber-500 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">Earnings</button>
-            <button @click="calendarFilter='dividend'" :class="calendarFilter==='dividend'?'bg-emerald-500 text-white':'bg-[var(--bg-2)] fg-2'" class="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition">Dividends</button>
-        </div>
-        <!-- Loading -->
-        <div x-show="calendarLoading" class="space-y-3"><template x-for="i in 5"><div class="skel h-16"></div></template></div>
-        <!-- Empty state -->
-        <div x-show="!calendarLoading && !calendarEvents.length" class="text-center py-16">
-            <svg class="w-12 h-12 fg-3 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <p class="fg-3 text-sm mb-1">No upcoming events</p>
-            <p class="text-xs fg-3">Add stocks to your watchlist or portfolio to see earnings and dividend dates</p>
-        </div>
-        <!-- Events -->
-        <div x-show="!calendarLoading && filteredCalendarEvents().length" class="space-y-2">
-            <template x-for="(event, idx) in filteredCalendarEvents()" :key="idx">
-                <div class="card card-h p-4 flex items-center gap-4 cursor-pointer" @click="event.type==='dividend'?loadDividendDetail(event.symbol):selectStock(event.symbol)">
-                    <div class="flex-shrink-0 text-center w-14">
-                        <div class="text-[10px] fg-3 font-medium" x-text="calendarDateLabel(event.date)"></div>
-                        <div class="text-lg font-bold fg-0" x-text="new Date(event.date+'T00:00:00').getDate()"></div>
-                        <div class="text-[10px] fg-3" x-text="new Date(event.date+'T00:00:00').toLocaleDateString('en-US',{month:'short'})"></div>
-                    </div>
-                    <div class="w-1.5 h-12 rounded-full flex-shrink-0" :class="event.type==='earnings'?'bg-amber-500':'bg-emerald-500'"></div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <div class="logo-wrap sm" x-data="{lvl:0}"><img x-show="lvl===0" :src="logoUrl(event.symbol)" @error="lvl=1" loading="lazy"><img x-show="lvl===1" :src="logoFallback(event.symbol)" @error="lvl=2" loading="lazy"><span x-show="lvl===2" x-text="event.symbol.charAt(0)"></span></div>
-                            <span class="text-[13px] font-semibold fg-0" x-text="event.symbol"></span>
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md" :class="event.type==='earnings'?'bg-amber-500/10 text-amber-400':'bg-emerald-500/10 text-emerald-400'" x-text="event.type==='earnings'?'EARNINGS':'DIVIDEND'"></span>
-                        </div>
-                        <div class="text-[11px] fg-3 mt-1">
-                            <template x-if="event.type==='earnings'"><span><span x-show="event.epsEstimate">EPS Est: $<span x-text="event.epsEstimate?.toFixed(2)"></span></span><span x-show="event.epsActual"> | Actual: $<span x-text="event.epsActual?.toFixed(2)"></span></span></span></template>
-                            <template x-if="event.type==='dividend'"><span><span x-show="event.amount">$<span x-text="parseFloat(event.amount).toFixed(2)"></span>/share</span><span x-show="event.yield"> | Yield: <span x-text="(event.yield*100).toFixed(2)"></span>%</span></span></template>
-                        </div>
-                    </div>
-                    <svg class="w-4 h-4 fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                </div>
-            </template>
-        </div>
-        <!-- Earnings Surprise Tracker -->
-        <div class="mt-6" x-show="!calendarLoading">
-            <div class="flex items-center justify-between mb-4">
-                <div><h3 class="text-base font-bold fg-0">Earnings Surprise Tracker</h3><p class="text-[12px] fg-3 mt-0.5">Historical EPS estimates vs actuals</p></div>
-            </div>
-            <div class="card p-5">
-                <div class="flex items-center gap-3 mb-4">
-                    <input type="text" x-model="earningsHistorySymbol" @keydown.enter="loadEarningsHistory(earningsHistorySymbol)" placeholder="Ticker e.g. AAPL" class="px-4 py-2.5 rounded-[10px] text-sm input-f w-36 uppercase" style="text-transform:uppercase">
-                    <button @click="loadEarningsHistory(earningsHistorySymbol)" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Track</button>
-                    <div x-show="earningsHistoryLoading" class="spinner"></div>
-                </div>
-                <div x-show="earningsHistory&&earningsHistory.length">
-                    <div id="earnings-surprise" style="min-height:280px"></div>
-                    <div class="grid grid-cols-3 gap-3 mt-4">
-                        <div class="bg-inset rounded-xl p-3 text-center">
-                            <div class="text-xl font-bold text-emerald-500" x-text="earningsHistory?.filter(e=>e.beat===true).length||0"></div>
-                            <div class="text-[10px] fg-3 font-semibold uppercase mt-0.5">Beats</div>
-                        </div>
-                        <div class="bg-inset rounded-xl p-3 text-center">
-                            <div class="text-xl font-bold text-red-500" x-text="earningsHistory?.filter(e=>e.beat===false).length||0"></div>
-                            <div class="text-[10px] fg-3 font-semibold uppercase mt-0.5">Misses</div>
-                        </div>
-                        <div class="bg-inset rounded-xl p-3 text-center">
-                            <div class="text-xl font-bold fg-2" x-text="earningsHistory?.filter(e=>e.beat==null&&e.epsEstimate!=null).length||0"></div>
-                            <div class="text-[10px] fg-3 font-semibold uppercase mt-0.5">Pending</div>
-                        </div>
-                    </div>
-                </div>
-                <div x-show="earningsHistory&&!earningsHistory.length&&!earningsHistoryLoading" class="text-sm fg-3 text-center py-6">No earnings data available for this symbol.</div>
-                <p x-show="!earningsHistory&&!earningsHistoryLoading" class="text-[12px] fg-3">Enter a ticker to see how it has performed vs analyst estimates over recent quarters.</p>
-            </div>
-        </div>
     </div>
 
     </div>
 </main>
-</div>
-
-<!-- Dividend Detail Modal -->
-<div x-show="showDividendDetail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showDividendDetail=false"></div>
-    <div class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-base font-bold fg-0" x-text="(dividendDetail?.symbol||'')+' Dividends'"></h3>
-            <button @click="showDividendDetail=false" class="fg-3 hover:fg-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
-        </div>
-        <div x-show="dividendDetailLoading" class="flex justify-center py-8"><div class="spinner"></div></div>
-        <div x-show="!dividendDetailLoading && dividendDetail">
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Annual Rate</div><div class="text-lg font-bold fg-0 mt-0.5" x-text="dividendDetail?.dividendRate?'$'+dividendDetail.dividendRate.toFixed(2):'—'"></div></div>
-                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Yield</div><div class="text-lg font-bold text-emerald-500 mt-0.5" x-text="dividendDetail?.dividendYield?(dividendDetail.dividendYield*100).toFixed(2)+'%':'—'"></div></div>
-                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Ex-Dividend</div><div class="text-sm font-bold fg-0 mt-0.5" x-text="dividendDetail?.exDividendDate||'—'"></div></div>
-                <div class="bg-[var(--bg-2)] rounded-xl p-3"><div class="text-[10px] fg-3 font-medium uppercase">Payout Ratio</div><div class="text-sm font-bold fg-0 mt-0.5" x-text="dividendDetail?.payoutRatio?(dividendDetail.payoutRatio*100).toFixed(1)+'%':'—'"></div></div>
-            </div>
-            <div x-show="dividendDetail?.history?.length">
-                <div class="text-[11px] fg-3 font-semibold uppercase tracking-wider mb-2">Payment History</div>
-                <div class="max-h-48 overflow-y-auto space-y-1">
-                    <template x-for="(d, i) in dividendDetail?.history||[]" :key="i">
-                        <div class="flex justify-between py-1.5 px-2 rounded-lg hover:bg-[var(--bg-2)] text-[12px]" style="border-bottom:1px solid var(--border-s)">
-                            <span class="fg-2" x-text="new Date(d.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})"></span>
-                            <span class="fg-0 font-medium" x-text="'$'+d.amount.toFixed(4)"></span>
-                        </div>
-                    </template>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Mobile nav -->
@@ -1130,63 +868,6 @@
             <button @click="saveEditHolding()" class="px-5 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Save</button>
         </div>
     </div>
-</div>
-
-<!-- Floating AI Chat -->
-<div class="fixed bottom-5 right-5 z-50" style="font-family:'Inter',system-ui,sans-serif">
-    <!-- Chat Panel -->
-    <div x-show="chatOpen" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4 scale-95" x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0 scale-100" x-transition:leave-end="opacity-0 translate-y-4 scale-95" class="mb-3 w-[340px] md:w-[380px] card shadow-2xl flex flex-col rounded-2xl overflow-hidden" style="height:480px">
-        <div class="p-3 flex items-center gap-2 flex-shrink-0" style="border-bottom:1px solid var(--border)">
-            <div class="w-7 h-7 bg-gradient-to-br from-brand-500 to-violet-600 rounded-lg flex items-center justify-center">
-                <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            </div>
-            <div class="flex-1">
-                <div class="text-[13px] font-semibold fg-0">TA Assistant</div>
-                <div class="text-[10px] fg-3">Ask about indicators, patterns & strategies</div>
-            </div>
-            <button @click="chatMessages=[]" class="text-[10px] fg-3 hover:fg-1 transition font-medium">Clear</button>
-        </div>
-        <div id="chat-body" class="flex-1 overflow-y-auto p-3 space-y-3" style="min-height:0">
-            <div x-show="!chatMessages.length" class="text-center py-6">
-                <div class="w-10 h-10 bg-gradient-to-br from-brand-500/20 to-violet-600/20 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-5 h-5 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                </div>
-                <p class="text-[12px] font-semibold fg-0 mb-1">Technical Analysis Teacher</p>
-                <p class="text-[10px] fg-3 mb-3 leading-relaxed">Chart patterns, indicators & strategies</p>
-                <div class="space-y-1">
-                    <button @click="chatInput='What is RSI and how do I use it?';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">What is RSI and how do I use it?</button>
-                    <button @click="chatInput='Explain the MACD indicator';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">Explain the MACD indicator</button>
-                    <button @click="chatInput='How do I identify support and resistance levels?';sendChat()" class="w-full text-left text-[11px] fg-2 hover:fg-0 bg-inset hover:bg-[var(--bg-3)] px-3 py-2 rounded-lg transition">How do I identify support &amp; resistance?</button>
-                </div>
-            </div>
-            <template x-for="(m,i) in chatMessages" :key="i">
-                <div :class="m.role==='user'?'flex justify-end':'flex justify-start'">
-                    <div :class="m.role==='user'?'bg-brand-600 text-white rounded-2xl rounded-br-md max-w-[85%]':'bg-inset fg-0 rounded-2xl rounded-bl-md max-w-[90%]'" class="px-3.5 py-2.5 text-[12.5px] leading-relaxed">
-                        <div x-html="fmtChat(m.content)"></div>
-                    </div>
-                </div>
-            </template>
-            <div x-show="chatLoading" class="flex justify-start">
-                <div class="bg-inset px-4 py-3 rounded-2xl rounded-bl-md">
-                    <div class="flex gap-1"><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:0ms"></span><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:150ms"></span><span class="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce" style="animation-delay:300ms"></span></div>
-                </div>
-            </div>
-        </div>
-        <div class="p-3 flex-shrink-0" style="border-top:1px solid var(--border)">
-            <div class="flex gap-2">
-                <input id="chat-input" type="text" x-model="chatInput" @keydown.enter="sendChat()" placeholder="Ask about technical analysis..." class="flex-1 px-3 py-2.5 rounded-[10px] text-[12.5px] input-f" :disabled="chatLoading">
-                <button @click="sendChat()" :disabled="chatLoading||!chatInput.trim()" class="px-3 py-2.5 bg-brand-600 text-white rounded-[10px] hover:bg-brand-700 transition disabled:opacity-40 flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                </button>
-            </div>
-            <div class="text-[9px] fg-3 mt-1.5 text-center">Educational only — not financial advice</div>
-        </div>
-    </div>
-    <!-- FAB Button -->
-    <button @click="toggleChat()" class="w-14 h-14 rounded-full bg-gradient-to-br from-brand-500 to-violet-600 text-white shadow-lg shadow-brand-600/30 hover:shadow-brand-600/50 hover:scale-105 transition-all flex items-center justify-center">
-        <svg x-show="!chatOpen" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        <svg x-show="chatOpen" x-cloak class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-    </button>
 </div>
 
 <script src="js/app.js"></script>

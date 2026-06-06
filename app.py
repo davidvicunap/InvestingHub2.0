@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import sqlite3
@@ -8,15 +9,13 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
-from flask import Flask, jsonify, request, g, Response, stream_with_context
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import jwt
 import bcrypt
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-import requests as http_requests
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +37,6 @@ if not _secret and not os.environ.get("FLASK_DEBUG"):
     _secret = "investorhub-dev-key-local-only"
     log.warning("SECRET_KEY not set — using insecure dev default. Set SECRET_KEY env var in production.")
 app.config["SECRET_KEY"] = _secret
-
-sentiment_analyzer = SentimentIntensityAnalyzer()
 
 
 # -- Database -----------------------------------------------------------------
@@ -230,6 +227,40 @@ def cache_response(ttl):
             return result
         return wrapper
     return decorator
+
+
+# -- Gzip Compression ---------------------------------------------------------
+
+_GZIP_MIN_BYTES = 1024
+
+
+@app.after_request
+def _compress(response):
+    """Gzip large JSON/text responses when the client supports it.
+
+    Guards on an existing Content-Encoding so cached (already-compressed)
+    responses returned a second time aren't double-compressed.
+    """
+    try:
+        if response.headers.get("Content-Encoding"):
+            return response
+        if "gzip" not in request.headers.get("Accept-Encoding", "").lower():
+            return response
+        if response.direct_passthrough or response.status_code >= 300:
+            return response
+        ctype = response.headers.get("Content-Type", "")
+        if not ("application/json" in ctype or ctype.startswith("text/")):
+            return response
+        data = response.get_data()
+        if len(data) < _GZIP_MIN_BYTES:
+            return response
+        response.set_data(gzip.compress(data, compresslevel=6))
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Content-Length"] = len(response.get_data())
+        response.headers.add("Vary", "Accept-Encoding")
+    except Exception:
+        pass
+    return response
 
 
 # -- API: Health Check --------------------------------------------------------
@@ -781,115 +812,6 @@ def api_technicals(symbol):
         return jsonify({"error": "Failed to fetch technicals"}), 500
 
 
-# -- News Fetcher (direct Yahoo Finance API) ----------------------------------
-
-def _fetch_yahoo_news(symbol, count=20):
-    """Fetch news directly from Yahoo Finance API, bypassing yfinance .news property."""
-    results = []
-
-    try:
-        encoded_sym = urllib.parse.quote(symbol, safe="")
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={encoded_sym}&quotesCount=0&newsCount={count}&enableFuzzyQuery=false"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            data = json.loads(resp.read().decode())
-        for item in data.get("news", []):
-            title = item.get("title", "")
-            if not title:
-                continue
-            thumbnail = ""
-            if item.get("thumbnail"):
-                resolutions = item["thumbnail"].get("resolutions", [])
-                if resolutions:
-                    thumbnail = resolutions[-1].get("url", "")
-            results.append({
-                "title": title,
-                "publisher": item.get("publisher", ""),
-                "link": item.get("link", "") or item.get("url", ""),
-                "publishedAt": item.get("providerPublishTime", 0),
-                "thumbnail": thumbnail,
-            })
-    except Exception:
-        pass
-
-    # Method 2: yfinance .news fallback (handles both old and new formats)
-    if not results:
-        try:
-            t = get_ticker(symbol)
-            news_items = t.news or []
-            for item in news_items[:count]:
-                title = item.get("title", "")
-                if not title:
-                    continue
-                link = item.get("link", "") or item.get("url", "") or item.get("canonical_url", "")
-                pub_date = item.get("providerPublishTime", 0) or item.get("provider_publish_time", 0)
-                thumbnail = ""
-                if item.get("thumbnail"):
-                    resolutions = item["thumbnail"].get("resolutions", [])
-                    if resolutions:
-                        thumbnail = resolutions[-1].get("url", "")
-                elif item.get("img"):
-                    thumbnail = item["img"]
-                results.append({
-                    "title": title,
-                    "publisher": item.get("publisher", "") or item.get("source", ""),
-                    "link": link,
-                    "publishedAt": pub_date,
-                    "thumbnail": thumbnail,
-                })
-        except Exception:
-            pass
-
-    return results
-
-
-def _analyze_sentiment(title):
-    """Run VADER sentiment on a headline and return label + scores."""
-    scores = sentiment_analyzer.polarity_scores(title)
-    compound = scores["compound"]
-    if compound >= 0.05:
-        label = "positive"
-    elif compound <= -0.05:
-        label = "negative"
-    else:
-        label = "neutral"
-    return {
-        "score": round(compound, 3),
-        "label": label,
-        "positive": round(scores["pos"], 3),
-        "negative": round(scores["neg"], 3),
-        "neutral": round(scores["neu"], 3),
-    }
-
-
-# -- API: News with Sentiment Analysis ----------------------------------------
-
-@app.route("/api/news/<symbol>")
-@cache_response(120)
-def api_news(symbol):
-    try:
-        news_items = _fetch_yahoo_news(symbol.upper(), count=20)
-        results = []
-        for item in news_items:
-            item["sentiment"] = _analyze_sentiment(item["title"])
-            results.append(item)
-
-        avg_sentiment = 0
-        if results:
-            avg_sentiment = sum(r["sentiment"]["score"] for r in results) / len(results)
-
-        return jsonify({
-            "symbol": symbol.upper(),
-            "news": results,
-            "averageSentiment": round(avg_sentiment, 3),
-            "totalArticles": len(results),
-        })
-    except Exception as e:
-        return jsonify({"error": "Server error"}), 500
-
-
-# -- API: Stock Health Score --------------------------------------------------
-
 @app.route("/api/score/<symbol>")
 @cache_response(300)
 def api_score(symbol):
@@ -1244,457 +1166,6 @@ def api_sec_filings(symbol):
         return jsonify({"error": "Server error"}), 500
 
 
-# -- API: Market News (General) -----------------------------------------------
-
-@app.route("/api/market-news")
-@cache_response(180)
-def api_market_news():
-    try:
-        major_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META"]
-        all_news = []
-        seen_titles = set()
-
-        def fetch_sym_news(sym):
-            return sym, _fetch_yahoo_news(sym, count=8)
-
-        with ThreadPoolExecutor(max_workers=7) as executor:
-            futures = [executor.submit(fetch_sym_news, sym) for sym in major_tickers]
-            for f in futures:
-                try:
-                    sym, items = f.result()
-                    for item in items:
-                        title = item.get("title", "")
-                        if not title or title in seen_titles:
-                            continue
-                        seen_titles.add(title)
-                        item["relatedSymbol"] = sym
-                        item["sentiment"] = _analyze_sentiment(title)
-                        all_news.append(item)
-                except Exception:
-                    continue
-
-        all_news.sort(key=lambda x: x.get("publishedAt", 0), reverse=True)
-        return jsonify({"news": all_news[:30]})
-    except Exception as e:
-        return jsonify({"error": "Server error"}), 500
-
-
-# -- API: AI Chat (Technical Analysis Teacher) --------------------------------
-
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-CHAT_MODEL = os.environ.get("CHAT_MODEL", "minimax/minimax-01")
-
-
-def _call_openrouter(messages, max_tokens=1200, temperature=0.6):
-    if not OPENROUTER_API_KEY:
-        return None, ("Chat API not configured", 503)
-    try:
-        resp = http_requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://davidvicunap.github.io",
-                "X-Title": "InvestorHub",
-            },
-            json={
-                "model": CHAT_MODEL,
-                "messages": messages,
-                "max_tokens": max_tokens,
-                "temperature": temperature,
-            },
-            timeout=45,
-        )
-        result = resp.json()
-        if resp.status_code != 200:
-            error_msg = result.get("error", {}).get("message", "Request failed")
-            return None, (error_msg, resp.status_code)
-        reply = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-        return reply, None
-    except Exception:
-        return None, ("Chat request failed", 500)
-
-TA_SYSTEM_PROMPT = """You are a Technical Analysis (TA) expert and teacher, trained in the style of the New York Institute of Finance curriculum. Your role is to educate users about technical analysis clearly and concisely.
-
-Your knowledge covers:
-
-**Foundations**: Dow Theory (six tenets), market structure (primary/secondary/minor trends), market phases (accumulation, markup, distribution, markdown), Efficient Market Hypothesis critique from a TA perspective.
-
-**Chart Types & Construction**: Line charts, bar charts (OHLC), candlestick charts (Japanese candlesticks — doji, hammer, engulfing, morning/evening star, harami, shooting star, hanging man, three white soldiers, three black crows, spinning tops), point & figure, Renko, Heikin-Ashi.
-
-**Trend Analysis**: Identifying uptrends, downtrends, and sideways markets. Trendlines, channels (ascending/descending/horizontal), trend exhaustion. Higher highs/higher lows vs lower highs/lower lows.
-
-**Support & Resistance**: Static vs dynamic S/R, role reversal principle, psychological price levels (round numbers), volume at price (volume profile), pivot points (classic, Fibonacci, Woodie, Camarilla).
-
-**Chart Patterns**: Reversal patterns (head & shoulders, inverse H&S, double top/bottom, triple top/bottom, rounding top/bottom, V-reversal). Continuation patterns (flags, pennants, wedges, rectangles, triangles — ascending/descending/symmetrical). Complex patterns (cup & handle, diamond, broadening formation).
-
-**Technical Indicators — Trend**: Simple Moving Average (SMA), Exponential Moving Average (EMA), Weighted Moving Average (WMA), moving average crossovers (golden cross/death cross), DEMA, TEMA, Ichimoku Cloud (tenkan-sen, kijun-sen, senkou span A/B, chikou span), Parabolic SAR, ADX/DMI.
-
-**Technical Indicators — Momentum/Oscillators**: Relative Strength Index (RSI) — overbought/oversold, divergences, failure swings. MACD — signal line, histogram, divergences. Stochastic Oscillator (%K, %D, fast/slow). Williams %R, CCI (Commodity Channel Index), Rate of Change (ROC), Momentum indicator.
-
-**Technical Indicators — Volatility**: Bollinger Bands (squeeze, expansion, %B, bandwidth), Average True Range (ATR), Keltner Channels, Donchian Channels, standard deviation, historical vs implied volatility.
-
-**Technical Indicators — Volume**: On-Balance Volume (OBV), Volume Price Trend (VPT), Accumulation/Distribution Line, Chaikin Money Flow (CMF), Money Flow Index (MFI), VWAP (Volume Weighted Average Price), volume spikes and climax volume.
-
-**Fibonacci Analysis**: Retracements (23.6%, 38.2%, 50%, 61.8%, 78.6%), extensions (127.2%, 161.8%, 261.8%), Fibonacci fans, arcs, time zones, confluence with S/R.
-
-**Elliott Wave Theory**: Five-wave impulse structure (waves 1-5), three-wave corrective structure (A-B-C), wave personality, alternation principle, wave counting rules (wave 2 never retraces 100% of wave 1, wave 3 is never the shortest, wave 4 does not overlap wave 1), fractal nature of waves.
-
-**Candlestick Patterns (Advanced)**: Two-candle patterns (bullish/bearish engulfing, piercing line/dark cloud cover, tweezer tops/bottoms). Three-candle patterns (morning/evening star, three inside up/down, three outside up/down, abandoned baby). Context matters — patterns at S/R vs mid-range.
-
-**Risk Management & Position Sizing**: Stop-loss placement (below S/R, ATR-based, percentage-based), risk-reward ratios (minimum 1:2), position sizing formulas, Kelly criterion, maximum drawdown management, correlation risk.
-
-**Market Breadth & Intermarket Analysis**: Advance-decline line, new highs/new lows, McClellan Oscillator, sector rotation, relative strength analysis, correlation between bonds/equities/commodities/currencies.
-
-**Trading Psychology**: Fear and greed cycles, confirmation bias, anchoring, loss aversion, herd behavior, emotional discipline, trading plan development.
-
-**Response guidelines**:
-- Be concise but thorough. Use 2-4 paragraphs maximum for most answers.
-- Include practical examples when explaining concepts (e.g., "If RSI drops below 30 on AAPL while price makes a higher low, that's a bullish divergence").
-- When relevant, mention which timeframes an indicator works best on.
-- Always mention limitations and false signals for any indicator or pattern.
-- If asked about trading advice, remind the user this is educational only, not financial advice.
-- Use clear formatting with bold for key terms."""
-
-
-@app.route("/api/chat", methods=["POST"])
-def api_chat():
-    data = request.get_json()
-    if not data or not data.get("messages"):
-        return jsonify({"error": "messages required"}), 400
-    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + data["messages"][-20:]
-    reply, err = _call_openrouter(messages, max_tokens=1024, temperature=0.7)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
-# -- API: AI Portfolio Review --------------------------------------------------
-
-PORTFOLIO_SYSTEM_PROMPT = """You are a Portfolio Analyst specializing in diversification, risk management, and strategic allocation. Analyze the user's portfolio and provide actionable insights.
-
-Your analysis should cover:
-- **Allocation**: Sector concentration, over/under-weight positions, single-stock risk
-- **Diversification**: Geographic, sector, market-cap diversity; correlation concerns
-- **Risk Assessment**: Beta-weighted exposure, volatility profile, drawdown potential
-- **Performance**: Winners/losers, cost basis efficiency, unrealized gains/losses
-- **Rebalancing**: Specific suggestions to improve risk-adjusted returns
-- **Income**: Dividend coverage, yield-on-cost if applicable
-
-Response guidelines:
-- Be specific and reference actual holdings by ticker
-- Provide 3-5 concrete, prioritized recommendations
-- Mention both risks and strengths
-- Keep total response under 400 words
-- Use bold for key terms and bullet points for clarity
-- Remind user this is educational, not financial advice"""
-
-
-@app.route("/api/chat/portfolio", methods=["POST"])
-@optional_auth
-def api_chat_portfolio():
-    data = request.get_json()
-    if not data or not data.get("portfolio_context"):
-        return jsonify({"error": "portfolio_context required"}), 400
-    user_message = data.get("message", "Please analyze my portfolio and provide recommendations.")
-    messages = [
-        {"role": "system", "content": PORTFOLIO_SYSTEM_PROMPT},
-        {"role": "user", "content": f"Here is my current portfolio:\n\n{data['portfolio_context']}\n\nUser question: {user_message}"}
-    ]
-    reply, err = _call_openrouter(messages, max_tokens=1500)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
-# -- API: AI Comparison Summary ------------------------------------------------
-
-COMPARE_SYSTEM_PROMPT = """You are a Stock Comparison Analyst. Given side-by-side metrics for multiple stocks, provide a concise, actionable comparison.
-
-Your analysis should cover:
-- **Valuation**: Which stock looks cheaper/more expensive on P/E, PEG, P/B
-- **Growth**: Who's growing faster (revenue, earnings)
-- **Profitability**: Margin & ROE comparison
-- **Risk**: Beta, debt levels, sector-specific risks
-- **Verdict**: Which stock is the better buy and for what type of investor
-
-Response guidelines:
-- Reference each ticker by name
-- Be opinionated — pick a winner with reasoning
-- Keep total response under 350 words
-- Use bold for key terms and bullet points for clarity
-- Remind user this is educational, not financial advice"""
-
-
-@app.route("/api/chat/compare", methods=["POST"])
-@optional_auth
-def api_chat_compare():
-    data = request.get_json()
-    if not data or not data.get("comparison_context"):
-        return jsonify({"error": "comparison_context required"}), 400
-    messages = [
-        {"role": "system", "content": COMPARE_SYSTEM_PROMPT},
-        {"role": "user", "content": data["comparison_context"]},
-    ]
-    reply, err = _call_openrouter(messages, max_tokens=1500)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
-# -- API: AI Fundamentals Summary ---------------------------------------------
-
-FUNDAMENTALS_SYSTEM_PROMPT = """You are a Fundamental Analysis Expert. Given a company's financial data, provide a clear narrative summary that a retail investor can act on.
-
-Your analysis should cover:
-- **Revenue Trend**: Growing, stagnating, or declining — and why it matters
-- **Profitability**: Margin trajectory, operating leverage, cost discipline
-- **Cash Flow**: Free cash flow health, ability to fund growth & return capital
-- **Balance Sheet**: Leverage, liquidity, and solvency risks
-- **Outlook**: What the numbers suggest about the next 1-2 years
-
-Response guidelines:
-- Use specific numbers from the data provided
-- Highlight the 2-3 most important takeaways
-- Keep total response under 350 words
-- Use bold for key terms and bullet points for clarity
-- Remind user this is educational, not financial advice"""
-
-
-@app.route("/api/chat/fundamentals", methods=["POST"])
-@optional_auth
-def api_chat_fundamentals():
-    data = request.get_json()
-    if not data or not data.get("fundamentals_context"):
-        return jsonify({"error": "fundamentals_context required"}), 400
-    messages = [
-        {"role": "system", "content": FUNDAMENTALS_SYSTEM_PROMPT},
-        {"role": "user", "content": data["fundamentals_context"]},
-    ]
-    reply, err = _call_openrouter(messages, max_tokens=1500)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
-# -- API: AI Chart Insight ----------------------------------------------------
-
-CHART_INSIGHT_SYSTEM_PROMPT = """You are a Technical Analysis Expert. Given a stock's current technical indicators, provide a concise, actionable chart read.
-
-Your analysis should cover:
-- **Trend**: Direction based on moving averages (SMA20 vs SMA50, price vs MAs)
-- **Momentum**: RSI reading — overbought, oversold, or neutral
-- **MACD**: Signal crossover status, histogram direction
-- **Bollinger Bands**: Price position relative to bands, squeeze/expansion
-- **Action**: Clear buy/sell/hold signal with specific levels to watch
-
-Response guidelines:
-- Be specific with price levels and indicator values
-- Give a clear directional bias
-- Keep total response under 300 words
-- Use bold for key terms and bullet points for clarity
-- Remind user this is educational, not financial advice"""
-
-
-@app.route("/api/chat/chart-insight", methods=["POST"])
-@optional_auth
-def api_chat_chart_insight():
-    data = request.get_json()
-    if not data or not data.get("chart_context"):
-        return jsonify({"error": "chart_context required"}), 400
-    messages = [
-        {"role": "system", "content": CHART_INSIGHT_SYSTEM_PROMPT},
-        {"role": "user", "content": data["chart_context"]},
-    ]
-    reply, err = _call_openrouter(messages)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
-# -- API: Earnings Calendar & Dividends ----------------------------------------
-
-_calendar_cache = {}
-_calendar_cache_time = {}
-_CALENDAR_TTL = 900
-
-
-@app.route("/api/earnings-calendar")
-@optional_auth
-def api_earnings_calendar():
-    """Returns upcoming earnings dates and dividend events for user's tracked stocks."""
-    db = get_db()
-    user = g.current_user
-    symbols = set()
-
-    if user:
-        rows = db.execute("SELECT symbol FROM holdings WHERE user_id = ?", (user["user_id"],)).fetchall()
-        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id = ?", (user["user_id"],)).fetchall()
-    else:
-        rows = db.execute("SELECT symbol FROM holdings WHERE user_id IS NULL").fetchall()
-        wrows = db.execute("SELECT symbol FROM watchlist WHERE user_id IS NULL").fetchall()
-
-    for r in rows:
-        symbols.add(r["symbol"])
-    for r in wrows:
-        symbols.add(r["symbol"])
-
-    if not symbols:
-        return jsonify({"events": []})
-
-    events = []
-
-    def fetch_calendar(sym):
-        now = datetime.utcnow().timestamp()
-        cache_key = f"cal_{sym}"
-        if cache_key in _calendar_cache and (now - _calendar_cache_time.get(cache_key, 0)) < _CALENDAR_TTL:
-            return _calendar_cache[cache_key]
-
-        result = []
-        try:
-            t = get_ticker(sym)
-
-            # Earnings dates
-            try:
-                ed = t.earnings_dates
-                if ed is not None and not ed.empty:
-                    for idx in ed.index[:4]:
-                        date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)[:10]
-                        row_data = ed.loc[idx]
-                        result.append({
-                            "symbol": sym,
-                            "type": "earnings",
-                            "date": date_str,
-                            "epsEstimate": float(row_data.get("EPS Estimate", 0)) if pd.notna(row_data.get("EPS Estimate", None)) else None,
-                            "epsActual": float(row_data.get("Reported EPS", 0)) if pd.notna(row_data.get("Reported EPS", None)) else None,
-                            "surprise": float(row_data.get("Surprise(%)", 0)) if pd.notna(row_data.get("Surprise(%)", None)) else None,
-                        })
-            except Exception:
-                pass
-
-            # Dividend info
-            try:
-                info = get_info(sym)
-                ex_div = safe_get(info, "exDividendDate")
-                if ex_div:
-                    if isinstance(ex_div, (int, float)):
-                        ex_date = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
-                    else:
-                        ex_date = str(ex_div)[:10]
-                    result.append({
-                        "symbol": sym,
-                        "type": "dividend",
-                        "date": ex_date,
-                        "amount": safe_get(info, "dividendRate", 0),
-                        "yield": safe_get(info, "dividendYield", 0),
-                    })
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-        _calendar_cache[cache_key] = result
-        _calendar_cache_time[cache_key] = now
-        return result
-
-    with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as executor:
-        results = list(executor.map(fetch_calendar, symbols))
-
-    for r in results:
-        events.extend(r)
-
-    # Filter to upcoming 90 days
-    today = datetime.utcnow().strftime('%Y-%m-%d')
-    future_limit = (datetime.utcnow() + timedelta(days=90)).strftime('%Y-%m-%d')
-    events = [e for e in events if e.get("date") and e["date"] >= today and e["date"] <= future_limit]
-    events.sort(key=lambda x: x.get("date", ""))
-
-    # Deduplicate
-    seen = set()
-    unique = []
-    for e in events:
-        key = f"{e['symbol']}_{e['type']}_{e['date']}"
-        if key not in seen:
-            seen.add(key)
-            unique.append(e)
-
-    return jsonify({"events": unique})
-
-
-@app.route("/api/dividends/<symbol>")
-@cache_response(300)
-def api_dividends(symbol):
-    """Returns dividend details and payment history for a symbol."""
-    try:
-        t = get_ticker(symbol.upper())
-        info = get_info(symbol.upper())
-        result = {
-            "symbol": symbol.upper(),
-            "dividendRate": safe_get(info, "dividendRate", 0),
-            "dividendYield": safe_get(info, "dividendYield", 0),
-            "exDividendDate": None,
-            "payoutRatio": safe_get(info, "payoutRatio", 0),
-            "fiveYearAvgDividendYield": safe_get(info, "fiveYearAvgDividendYield", 0),
-            "history": [],
-        }
-
-        ex_div = safe_get(info, "exDividendDate")
-        if ex_div and isinstance(ex_div, (int, float)):
-            result["exDividendDate"] = datetime.fromtimestamp(ex_div).strftime('%Y-%m-%d')
-        elif ex_div:
-            result["exDividendDate"] = str(ex_div)[:10]
-
-        try:
-            divs = t.dividends
-            if divs is not None and not divs.empty:
-                three_years_ago = (datetime.utcnow() - timedelta(days=1095)).strftime('%Y-%m-%d')
-                recent = divs[divs.index >= three_years_ago] if len(divs) > 20 else divs.tail(20)
-                result["history"] = [
-                    {"date": idx.strftime('%Y-%m-%d'), "amount": round(float(val), 4)}
-                    for idx, val in recent.items()
-                ]
-        except Exception:
-            pass
-
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": "Server error"}), 500
-
-
-# -- API: AI Watchlist Digest -------------------------------------------------
-
-WATCHLIST_DIGEST_PROMPT = """You are a Market Analyst providing a daily watchlist briefing. Given the user's watchlist with current prices and changes, provide a concise, actionable summary.
-
-Your briefing should cover:
-- **Top Movers**: Biggest gainers and losers today with context
-- **Key Levels**: Any stocks near 52-week highs/lows or significant support/resistance
-- **Alerts**: Unusual moves, high volume, or notable patterns
-- **Outlook**: Brief market context and what to watch for
-
-Response guidelines:
-- Be specific with ticker names and numbers
-- Prioritize actionable information
-- Keep total response under 300 words
-- Use bold for key terms and bullet points
-- Remind user this is educational, not financial advice"""
-
-
-@app.route("/api/chat/watchlist-digest", methods=["POST"])
-@optional_auth
-def api_chat_watchlist_digest():
-    data = request.get_json()
-    if not data or not data.get("watchlist_context"):
-        return jsonify({"error": "watchlist_context required"}), 400
-    messages = [
-        {"role": "system", "content": WATCHLIST_DIGEST_PROMPT},
-        {"role": "user", "content": data["watchlist_context"]},
-    ]
-    reply, err = _call_openrouter(messages)
-    if err:
-        return jsonify({"error": err[0]}), err[1]
-    return jsonify({"reply": reply})
-
-
 # -- API: Sector Peers --------------------------------------------------------
 
 @app.route("/api/peers/<symbol>")
@@ -1760,108 +1231,6 @@ def api_peers(symbol):
         })
     except Exception as e:
         return jsonify({"error": "Server error"}), 500
-
-
-# -- API: Earnings History (Surprise Tracker) ----------------------------------
-
-@app.route("/api/earnings-history/<symbol>")
-@cache_response(300)
-def api_earnings_history(symbol):
-    try:
-        t = get_ticker(symbol.upper())
-        ed = t.earnings_dates
-        history = []
-        if ed is not None and not ed.empty:
-            for idx in ed.index[:12]:
-                date_str = idx.strftime('%Y-%m-%d') if hasattr(idx, 'strftime') else str(idx)[:10]
-                row_data = ed.loc[idx]
-                estimate = float(row_data.get("EPS Estimate", 0)) if pd.notna(row_data.get("EPS Estimate", None)) else None
-                actual = float(row_data.get("Reported EPS", 0)) if pd.notna(row_data.get("Reported EPS", None)) else None
-                surprise = float(row_data.get("Surprise(%)", 0)) if pd.notna(row_data.get("Surprise(%)", None)) else None
-                beat = None
-                if estimate is not None and actual is not None:
-                    beat = actual > estimate
-                history.append({
-                    "date": date_str,
-                    "epsEstimate": estimate,
-                    "epsActual": actual,
-                    "surprise": surprise,
-                    "beat": beat,
-                })
-
-        return jsonify({
-            "symbol": symbol.upper(),
-            "history": history,
-        })
-    except Exception as e:
-        return jsonify({"error": "Server error"}), 500
-
-
-# -- API: Streaming AI Chat ---------------------------------------------------
-
-@app.route("/api/chat/stream", methods=["POST"])
-@optional_auth
-def api_chat_stream():
-    if not OPENROUTER_API_KEY:
-        return jsonify({"error": "Chat API not configured"}), 503
-
-    data = request.get_json()
-    if not data or not data.get("messages"):
-        return jsonify({"error": "messages required"}), 400
-
-    user_messages = data["messages"][-20:]
-    messages = [{"role": "system", "content": TA_SYSTEM_PROMPT}] + user_messages
-
-    def generate():
-        try:
-            resp = http_requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://davidvicunap.github.io",
-                    "X-Title": "InvestorHub",
-                },
-                json={
-                    "model": CHAT_MODEL,
-                    "messages": messages,
-                    "max_tokens": 1200,
-                    "temperature": 0.7,
-                    "stream": True,
-                },
-                timeout=60,
-                stream=True,
-            )
-
-            if resp.status_code != 200:
-                yield f"data: {json.dumps({'error': 'API error'})}\n\n"
-                return
-
-            for line in resp.iter_lines():
-                if not line:
-                    continue
-                line_str = line.decode("utf-8")
-                if line_str.startswith("data: "):
-                    payload = line_str[6:]
-                    if payload.strip() == "[DONE]":
-                        yield "data: [DONE]\n\n"
-                        return
-                    try:
-                        chunk = json.loads(payload)
-                        delta = chunk.get("choices", [{}])[0].get("delta", {})
-                        content = delta.get("content", "")
-                        if content:
-                            yield f"data: {json.dumps({'content': content})}\n\n"
-                    except json.JSONDecodeError:
-                        continue
-        except Exception as e:
-            yield f"data: {json.dumps({'error': 'Stream error'})}\n\n"
-
-    return Response(
-        stream_with_context(generate()),
-        content_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
 
 
 # -- Run ----------------------------------------------------------------------
