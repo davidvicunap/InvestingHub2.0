@@ -78,7 +78,7 @@ function app() {
         apex:{}, tv:{},
         _apiCache:{},
         _cacheTTLs:{'/api/market':60,'/api/watchlist':30,'/api/portfolio':30,'/api/portfolio/analytics':30,'/api/movers':120},
-        _cachePrefixTTLs:[['/api/quote/',30],['/api/history/',60],['/api/technicals/',60],['/api/fundamentals/',300],['/api/score/',300],['/api/sec-filings/',120],['/api/peers/',300],['/api/compare?',60],['/api/returns/',120],['/api/dividends/',600],['/api/analysts/',300],['/api/valuation/',600],['/api/earnings/',600]],
+        _cachePrefixTTLs:[['/api/quote/',60],['/api/history/',600],['/api/technicals/',300],['/api/fundamentals/',3600],['/api/score/',1800],['/api/sec-filings/',3600],['/api/peers/',1800],['/api/compare?',300],['/api/returns/',600],['/api/dividends/',3600],['/api/analysts/',1800],['/api/valuation/',1800],['/api/earnings/',3600]],
 
         init() {
             this.applyTheme();
@@ -153,7 +153,7 @@ function app() {
         // ── Nav ──
         navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio();this.loadMovers()}if(p==='portfolio'){this.loadPortfolioAnalytics();this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()})}},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
-        switchTab(t){this.analysisTab=t;this.$nextTick(()=>{if(t==='Overview')this.renderEarningsChart();if(t==='Chart')this.loadPriceChart();if(t==='Technicals')this.loadTech();if(t==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(t==='Dividends'){this.dividendData?this.renderDividendChart():this.loadDividends(this.analysisData?.symbol)}if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(this.analysisData?.symbol)})},
+        switchTab(t){this.analysisTab=t;const s=this.analysisData?.symbol;this.$nextTick(()=>{if(t==='Overview')this.renderEarningsChart();if(t==='Chart')this.loadPriceChart();if(t==='Technicals')this.loadTech();if(t==='Fundamentals'){this.fundamentalsData?this.renderFundCharts():this.loadFundamentals(s)}if(t==='Financials'&&!this.fundamentalsData)this.loadFundamentals(s);if(t==='Dividends'){this.dividendData?this.renderDividendChart():this.loadDividends(s)}if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(s)})},
 
         // ── Helpers ──
         _logoDomain(s){const c=s.replace('^','').replace('-USD','').replace('=F','').toUpperCase();return LOGO_DOMAINS[c]||c.toLowerCase()+'.com'},
@@ -280,13 +280,13 @@ function app() {
                 this.api(`/api/valuation/${s}`).then(v=>{if(!v.error)this.valuationData=v}).catch(()=>{});
                 this.api(`/api/analysts/${s}`).then(a=>{if(!a.error)this.analystData=a}).catch(()=>{});
                 this.api(`/api/earnings/${s}`).then(e=>{if(!e.error){this.earningsData=e;if(this.analysisTab==='Overview')this.$nextTick(()=>this.renderEarningsChart())}}).catch(()=>{});
-                this.api(`/api/fundamentals/${s}`).then(f=>this.fundamentalsData=f).catch(()=>{});
                 this.api(`/api/score/${s}`).then(sc=>this.stockScore=sc).catch(()=>{});
                 this.loadPeers(s);
             }catch(e){console.error(e)}
             this.analysisLoading=false;
         },
         async loadDividends(s){if(!s)return;this.dividendLoading=true;try{const d=await this.api(`/api/dividends/${s}`);if(!d.error){this.dividendData=d;this.$nextTick(()=>this.renderDividendChart())}}catch(e){}this.dividendLoading=false},
+        async loadFundamentals(s){if(!s||this.fundamentalsData)return;try{const f=await this.api(`/api/fundamentals/${s}`);if(!f.error){this.fundamentalsData=f;if(this.analysisTab==='Fundamentals')this.$nextTick(()=>this.renderFundCharts())}}catch(e){}},
         renderEarningsChart(){
             if(!this.earningsData||!document.getElementById('eps-chart'))return;const c=this.tc();
             const past=(this.earningsData.history||[]).filter(h=>h.epsActual!=null).slice(0,8).reverse();

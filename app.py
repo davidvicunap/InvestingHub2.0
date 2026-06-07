@@ -431,7 +431,7 @@ def api_search():
 # -- API: Quote ---------------------------------------------------------------
 
 @app.route("/api/quote/<symbol>")
-@cache_response(30)
+@cache_response(60)
 def api_quote(symbol):
     try:
         info = get_info(symbol)
@@ -506,7 +506,7 @@ def api_quote(symbol):
 # -- API: Price History -------------------------------------------------------
 
 @app.route("/api/history/<symbol>")
-@cache_response(60)
+@cache_response(600)
 def api_history(symbol):
     period = request.args.get("period", "1y")
     interval = request.args.get("interval", "1d")
@@ -532,7 +532,7 @@ def api_history(symbol):
 # -- API: Fundamentals --------------------------------------------------------
 
 @app.route("/api/fundamentals/<symbol>")
-@cache_response(300)
+@cache_response(3600)
 def api_fundamentals(symbol):
     try:
         t = get_ticker(symbol)
@@ -612,7 +612,7 @@ def api_market():
 # -- API: Compare Stocks ------------------------------------------------------
 
 @app.route("/api/compare")
-@cache_response(60)
+@cache_response(300)
 def api_compare():
     symbols = request.args.get("symbols", "").split(",")
     symbols = [s.strip().upper() for s in symbols if s.strip()]
@@ -829,7 +829,7 @@ def api_watchlist_delete(symbol):
 # -- API: Technical Indicators ------------------------------------------------
 
 @app.route("/api/technicals/<symbol>")
-@cache_response(60)
+@cache_response(300)
 def api_technicals(symbol):
     period = request.args.get("period", "1y")
     try:
@@ -878,7 +878,7 @@ def api_technicals(symbol):
 
 
 @app.route("/api/score/<symbol>")
-@cache_response(300)
+@cache_response(1800)
 def api_score(symbol):
     try:
         info = get_info(symbol)
@@ -1176,7 +1176,7 @@ def _get_sec_cik(symbol):
 
 
 @app.route("/api/sec-filings/<symbol>")
-@cache_response(120)
+@cache_response(3600)
 def api_sec_filings(symbol):
     symbol = symbol.upper().strip()
     try:
@@ -1234,7 +1234,7 @@ def api_sec_filings(symbol):
 # -- API: Sector Peers --------------------------------------------------------
 
 @app.route("/api/peers/<symbol>")
-@cache_response(300)
+@cache_response(1800)
 def api_peers(symbol):
     try:
         info = get_info(symbol.upper())
@@ -1301,7 +1301,7 @@ def api_peers(symbol):
 # -- API: Returns & Risk ------------------------------------------------------
 
 @app.route("/api/returns/<symbol>")
-@cache_response(120)
+@cache_response(600)
 def api_returns(symbol):
     """Multi-timeframe price returns plus risk metrics (volatility, drawdown,
     Sharpe, 52-week range position) — the numbers investors check first."""
@@ -1436,7 +1436,7 @@ def api_dividends(symbol):
 # -- API: Analyst Coverage ----------------------------------------------------
 
 @app.route("/api/analysts/<symbol>")
-@cache_response(600)
+@cache_response(1800)
 def api_analysts(symbol):
     """Analyst consensus: price targets with implied upside and the buy/hold/sell
     distribution (the breadth behind a single 'buy' rating)."""
@@ -1480,7 +1480,7 @@ def api_analysts(symbol):
 # -- API: Valuation / Fair Value ----------------------------------------------
 
 @app.route("/api/valuation/<symbol>")
-@cache_response(900)
+@cache_response(1800)
 def api_valuation(symbol):
     """Transparent fair-value estimate blending analyst consensus, an earnings-
     growth multiple (PEG=1, Lynch) and a 5-year DCF. Each method shows its
@@ -1552,7 +1552,7 @@ def api_valuation(symbol):
 # -- API: Earnings ------------------------------------------------------------
 
 @app.route("/api/earnings/<symbol>")
-@cache_response(1800)
+@cache_response(3600)
 def api_earnings(symbol):
     """Earnings beat/miss history and the next reporting date."""
     try:

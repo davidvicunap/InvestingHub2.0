@@ -6,7 +6,11 @@ name: Keep backend awake
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # every 10 minutes
+    # Every 5 min. Render free dynos sleep after ~15 min idle and GitHub's
+    # scheduler often runs late, so a tight interval keeps a safety margin.
+    # For true reliability use an external pinger (UptimeRobot / cron-job.org)
+    # or upgrade Render to a paid tier (no spin-down).
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}        # allow manual runs
 
 jobs:
