@@ -991,7 +991,7 @@
             <!-- Comparison Table -->
             <div class="card overflow-hidden">
                 <div class="overflow-x-auto"><table class="w-full text-[13px]">
-                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th>
+                    <thead><tr style="border-bottom:1px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Metric</th>
                         <template x-for="s in Object.keys(compareData||{})" :key="s"><th class="text-right p-3.5">
                             <div class="flex items-center justify-end gap-2">
                                 <div class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0 bg-[var(--bg-2)] flex items-center justify-center" x-data="{lvl:0}">
@@ -1105,7 +1105,7 @@
                             <span x-show="lvl===2" x-text="metricsData.symbol.charAt(0)"></span>
                         </div>
                         <div>
-                            <div class="font-bold fg-0 leading-tight" x-text="metricsData.symbol"></div>
+                            <div class="font-semibold fg-0 leading-tight" x-text="metricsData.symbol"></div>
                             <div class="text-[11px] fg-3" x-text="(metricsData.frequency==='annual'?'Annual':'Quarterly')+' · '+(chartOverlay==='yoy'?'year-over-year growth':chartOverlay==='sma'?'with moving average':'reported values')"></div>
                         </div>
                     </div>
@@ -1149,20 +1149,24 @@
                 <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition flex items-center gap-2"><svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
             </div>
         </div>
-        <div x-show="portfolio.length" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Value</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="'$'+ptv().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Cost</div><div class="text-lg font-bold fg-0 mt-1 tabular-nums" x-text="'$'+ptc().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">P&L</div><div :class="ptp()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptp()>=0?'+':'-'"></span>$<span x-text="Math.abs(ptp()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Return</div><div :class="ptr()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-bold mt-1 tabular-nums"><span x-text="ptr()>=0?'+':''"></span><span x-text="ptr().toFixed(2)"></span>%</div></div>
+        <div x-show="portfolio.length" class="card overflow-hidden mb-5">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-px" style="background:var(--border)">
+                <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Value</div><div class="text-lg font-semibold fg-0 mt-1 tabular-nums" x-text="'$'+ptv().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
+                <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Cost</div><div class="text-lg font-semibold fg-0 mt-1 tabular-nums" x-text="'$'+ptc().toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></div></div>
+                <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">P&L</div><div :class="ptp()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-semibold mt-1 tabular-nums"><span x-text="ptp()>=0?'+':'-'"></span>$<span x-text="Math.abs(ptp()).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})"></span></div></div>
+                <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Return</div><div :class="ptr()>=0?'text-emerald-500':'text-red-500'" class="text-lg font-semibold mt-1 tabular-nums"><span x-text="ptr()>=0?'+':''"></span><span x-text="ptr().toFixed(2)"></span>%</div></div>
+            </div>
         </div>
         <!-- Portfolio Intelligence -->
-        <div x-show="portfolio.length&&portfolioAnalytics&&portfolioAnalytics.holdings" x-cloak class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Day Change</div><div class="text-[15px] font-bold mt-1 tabular-nums" :class="(portfolioAnalytics?.dayChange||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChange||0)>=0?'+':'-'"></span>$<span x-text="Math.abs(portfolioAnalytics?.dayChange||0).toLocaleString('en-US',{maximumFractionDigits:0})"></span></div><div class="text-[10px] tabular-nums" :class="(portfolioAnalytics?.dayChangePct||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChangePct||0)>=0?'+':''"></span><span x-text="(portfolioAnalytics?.dayChangePct||0).toFixed(2)"></span>%</div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">vs S&P 500</div><div class="text-[15px] font-bold mt-1 tabular-nums" :class="relSpy()>=0?'text-emerald-500':'text-red-500'"><span x-text="relSpy()>=0?'+':''"></span><span x-text="relSpy().toFixed(2)"></span>%</div><div class="text-[10px] fg-3">SPY <span x-text="portfolioAnalytics?.spyDayChange!=null?(portfolioAnalytics.spyDayChange>=0?'+':'')+portfolioAnalytics.spyDayChange.toFixed(2)+'%':'—'"></span></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Annual Income</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="'$'+(portfolioAnalytics?.annualIncome||0).toLocaleString('en-US',{maximumFractionDigits:0})"></div><div class="text-[10px] fg-3"><span x-text="(portfolioAnalytics?.portfolioYield||0).toFixed(2)"></span>% yield</div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Yield on Cost</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.yieldOnCost||0).toFixed(2)+'%'"></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Portfolio Beta</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.beta||0).toFixed(2)"></div><div class="text-[10px] fg-3" x-text="(portfolioAnalytics?.beta||0)>1?'more volatile':'less volatile'"></div></div>
-            <div class="card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Top Position</div><div class="text-[15px] font-bold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.topWeight||0).toFixed(0)+'%'"></div><div class="text-[10px] fg-3 truncate" x-text="portfolioAnalytics?.diversification"></div></div>
+        <div x-show="portfolio.length&&portfolioAnalytics&&portfolioAnalytics.holdings" x-cloak class="card overflow-hidden mb-5">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-px" style="background:var(--border)">
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Day Change</div><div class="text-[15px] font-semibold mt-1 tabular-nums" :class="(portfolioAnalytics?.dayChange||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChange||0)>=0?'+':'-'"></span>$<span x-text="Math.abs(portfolioAnalytics?.dayChange||0).toLocaleString('en-US',{maximumFractionDigits:0})"></span></div><div class="text-[10px] tabular-nums" :class="(portfolioAnalytics?.dayChangePct||0)>=0?'text-emerald-500':'text-red-500'"><span x-text="(portfolioAnalytics?.dayChangePct||0)>=0?'+':''"></span><span x-text="(portfolioAnalytics?.dayChangePct||0).toFixed(2)"></span>%</div></div>
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">vs S&P 500</div><div class="text-[15px] font-semibold mt-1 tabular-nums" :class="relSpy()>=0?'text-emerald-500':'text-red-500'"><span x-text="relSpy()>=0?'+':''"></span><span x-text="relSpy().toFixed(2)"></span>%</div><div class="text-[10px] fg-3">SPY <span x-text="portfolioAnalytics?.spyDayChange!=null?(portfolioAnalytics.spyDayChange>=0?'+':'')+portfolioAnalytics.spyDayChange.toFixed(2)+'%':'—'"></span></div></div>
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Annual Income</div><div class="text-[15px] font-semibold fg-0 mt-1 tabular-nums" x-text="'$'+(portfolioAnalytics?.annualIncome||0).toLocaleString('en-US',{maximumFractionDigits:0})"></div><div class="text-[10px] fg-3"><span x-text="(portfolioAnalytics?.portfolioYield||0).toFixed(2)"></span>% yield</div></div>
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Yield on Cost</div><div class="text-[15px] font-semibold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.yieldOnCost||0).toFixed(2)+'%'"></div></div>
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Portfolio Beta</div><div class="text-[15px] font-semibold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.beta||0).toFixed(2)"></div><div class="text-[10px] fg-3" x-text="(portfolioAnalytics?.beta||0)>1?'more volatile':'less volatile'"></div></div>
+            <div class="bg-card p-4"><div class="text-[10px] fg-3 uppercase font-semibold">Top Position</div><div class="text-[15px] font-semibold fg-0 mt-1 tabular-nums" x-text="(portfolioAnalytics?.topWeight||0).toFixed(0)+'%'"></div><div class="text-[10px] fg-3 truncate" x-text="portfolioAnalytics?.diversification"></div></div>
+            </div>
         </div>
         <div x-show="portfolio.length" class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
             <div class="card p-5"><div class="text-[13px] font-semibold fg-0 mb-3">Allocation</div><div id="p-alloc" style="min-height:260px"></div></div>
@@ -1194,7 +1198,7 @@
             <div x-show="!portfolioLoading&&!portfolio.length" class="text-center py-16"><p class="fg-3 text-sm">No holdings yet</p></div>
             <div x-show="!portfolioLoading&&portfolio.length" class="overflow-x-auto">
                 <table class="w-full text-[13px]">
-                    <thead><tr style="border-bottom:2px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Stock</th><th class="text-right p-3.5 fg-2 font-medium">Shares</th><th class="text-right p-3.5 fg-2 font-medium">Avg Cost</th><th class="text-right p-3.5 fg-2 font-medium">Price</th><th class="text-right p-3.5 fg-2 font-medium">Value</th><th class="text-right p-3.5 fg-2 font-medium">P&L</th><th class="text-right p-3.5 fg-2 font-medium">Return</th><th class="text-center p-3.5 fg-2 font-medium w-10"></th></tr></thead>
+                    <thead><tr style="border-bottom:1px solid var(--border)"><th class="text-left p-3.5 fg-2 font-medium">Stock</th><th class="text-right p-3.5 fg-2 font-medium">Shares</th><th class="text-right p-3.5 fg-2 font-medium">Avg Cost</th><th class="text-right p-3.5 fg-2 font-medium">Price</th><th class="text-right p-3.5 fg-2 font-medium">Value</th><th class="text-right p-3.5 fg-2 font-medium">P&L</th><th class="text-right p-3.5 fg-2 font-medium">Return</th><th class="text-center p-3.5 fg-2 font-medium w-10"></th></tr></thead>
                     <tbody>
                         <template x-for="h in portfolio" :key="h.id">
                             <tr class="hover:bg-[var(--bg-2)] transition" style="border-bottom:1px solid var(--border-s)">
@@ -1236,7 +1240,7 @@
 <div x-show="showAddHolding" x-cloak @keydown.escape.window="showAddHolding=false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showAddHolding=false"></div>
     <div role="dialog" aria-modal="true" aria-labelledby="add-holding-title" class="relative card shadow-xl w-full max-w-md p-6 fade" @click.stop>
-        <h3 id="add-holding-title" class="text-base font-bold fg-0 mb-4">Add Holding</h3>
+        <h3 id="add-holding-title" class="text-base font-semibold fg-0 mb-4">Add Holding</h3>
         <div class="space-y-3">
             <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol *</label><input type="text" x-model="newHolding.symbol" placeholder="AAPL" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase" style="text-transform:uppercase"></div>
             <div class="grid grid-cols-2 gap-3">
@@ -1256,7 +1260,7 @@
 <div x-show="showEditHolding" x-cloak @keydown.escape.window="showEditHolding=false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showEditHolding=false"></div>
     <div role="dialog" aria-modal="true" aria-labelledby="edit-holding-title" class="relative card shadow-xl w-full max-w-md p-6 fade" @click.stop>
-        <h3 id="edit-holding-title" class="text-base font-bold fg-0 mb-4">Edit Holding</h3>
+        <h3 id="edit-holding-title" class="text-base font-semibold fg-0 mb-4">Edit Holding</h3>
         <div class="space-y-3">
             <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol</label><input type="text" :value="editingHolding.symbol" disabled class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase opacity-60"></div>
             <div class="grid grid-cols-2 gap-3">
