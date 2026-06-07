@@ -28,36 +28,37 @@
         :root{
             --bg-0:#f8fafc;--bg-1:#ffffff;--bg-2:#f1f5f9;--bg-3:#e2e8f0;
             --fg-0:#0f172a;--fg-1:#334155;--fg-2:#64748b;--fg-3:#94a3b8;
-            --border:#e2e8f0;--border-s:#f1f5f9;
-            --card-shadow:0 1px 3px rgba(0,0,0,.04);
-            --card-shadow-h:0 8px 30px rgba(0,0,0,.08);
-            --glass:rgba(248,250,252,.82);
+            --border:#e7eaef;--border-s:#f1f5f9;--border-h:#d3d9e0;
+            --card-shadow:0 1px 2px rgba(15,23,42,.04);
+            --card-shadow-h:0 4px 16px rgba(15,23,42,.07);
+            --glass:rgba(255,255,255,.8);
         }
         html.dark{
             --bg-0:#060a14;--bg-1:#0f1729;--bg-2:#162036;--bg-3:#1e293b;
             --fg-0:#f1f5f9;--fg-1:#cbd5e1;--fg-2:#64748b;--fg-3:#475569;
-            --border:rgba(55,65,81,.45);--border-s:rgba(55,65,81,.25);
-            --card-shadow:0 1px 3px rgba(0,0,0,.4);
-            --card-shadow-h:0 8px 30px rgba(0,0,0,.55);
-            --glass:rgba(6,10,20,.82);
+            --border:rgba(148,163,184,.16);--border-s:rgba(148,163,184,.09);--border-h:rgba(148,163,184,.3);
+            --card-shadow:0 1px 2px rgba(0,0,0,.25);
+            --card-shadow-h:0 4px 16px rgba(0,0,0,.4);
+            --glass:rgba(10,15,26,.8);
         }
 
         /* ── Utility classes ── */
         .bg-page{background:var(--bg-0)}.bg-card{background:var(--bg-1)}.bg-inset{background:var(--bg-2)}.bg-deep{background:var(--bg-3)}
         .fg-0{color:var(--fg-0)}.fg-1{color:var(--fg-1)}.fg-2{color:var(--fg-2)}.fg-3{color:var(--fg-3)}
         .bdr-t{border-color:var(--border)}.bdr-s{border-color:var(--border-s)}
-        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;box-shadow:var(--card-shadow)}
-        .card-h{transition:all .25s cubic-bezier(.4,0,.2,1)}.card-h:hover{box-shadow:var(--card-shadow-h);transform:translateY(-1px)}
+        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:12px;box-shadow:var(--card-shadow)}
+        .card-h{transition:border-color .15s ease,box-shadow .15s ease}.card-h:hover{border-color:var(--border-h);box-shadow:var(--card-shadow-h)}
         .glass{background:var(--glass);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--border)}
         .input-f{background:var(--bg-2);border:1px solid var(--border);color:var(--fg-0);border-radius:10px;transition:all .15s}
-        .input-f:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+        .input-f:focus{border-color:#2563eb;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
 
         .pill-bar{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--bg-2)}
         .pill{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--fg-2);cursor:pointer;border:none;background:transparent;transition:all .15s;white-space:nowrap}
-        .pill:hover{color:var(--fg-0)}.pill.on{background:#6366f1;color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.35)}
+        .pill:hover{color:var(--fg-0)}.pill.on{background:var(--bg-1);color:var(--fg-0);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+        html.dark .pill.on{background:var(--bg-3)}
 
         .fade{animation:fadeIn .35s ease-out}@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-        .spinner{border:2.5px solid var(--border);border-top-color:#6366f1;border-radius:50%;width:24px;height:24px;animation:sp .65s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+        .spinner{border:2.5px solid var(--border);border-top-color:#2563eb;border-radius:50%;width:24px;height:24px;animation:sp .65s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
         .dot-pulse{width:6px;height:6px;border-radius:50%;background:#10b981;animation:dp 2s infinite}@keyframes dp{0%,100%{opacity:1}50%{opacity:.35}}
 
         /* skeleton shimmer */
@@ -84,13 +85,11 @@
         .score-bar{height:8px;border-radius:99px;overflow:hidden;background:var(--bg-2);position:relative}
         .score-bar .fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
 
-        /* Gradient score header */
-        .score-hdr{background:linear-gradient(135deg,rgba(99,102,241,.06) 0%,rgba(139,92,246,.06) 50%,rgba(6,182,212,.04) 100%)}
-        html.dark .score-hdr{background:linear-gradient(135deg,rgba(99,102,241,.1) 0%,rgba(139,92,246,.08) 50%,rgba(6,182,212,.06) 100%)}
+        /* Score header — flat, subtle inset */
+        .score-hdr{background:var(--bg-2);border-bottom:1px solid var(--border)}
 
-        /* Stock header */
-        .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.03) 100%)}
-        html.dark .stock-hdr{background:linear-gradient(135deg,var(--bg-1) 0%,var(--bg-1) 60%,rgba(99,102,241,.06) 100%)}
+        /* Stock header — flat card surface */
+        .stock-hdr{background:var(--bg-1)}
 
         /* AI prose */
         .ai-prose strong{color:var(--fg-0);font-weight:600}
@@ -122,91 +121,76 @@
 
 <body class="bg-page fg-1 min-h-screen" x-data="app()" x-init="init()">
 
-<!-- ─── AUTH GATE (full-page login/register) ─── -->
-<div x-show="!authToken" x-cloak class="min-h-screen flex items-center justify-center p-4 md:p-8">
-    <div class="w-full max-w-4xl flex flex-col md:flex-row gap-8 md:gap-12 items-center">
-        <!-- Left: Branding & Features -->
-        <div class="flex-1 text-center md:text-left max-w-md">
-            <div class="flex items-center gap-3 justify-center md:justify-start mb-6">
-                <div class="w-12 h-12 bg-gradient-to-br from-brand-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/25">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+<!-- ─── AUTH GATE (landing + login/register) ─── -->
+<div x-show="!authToken" x-cloak class="min-h-screen flex items-center justify-center px-5 py-10">
+    <div class="w-full max-w-5xl grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <!-- Hero -->
+        <div class="max-w-lg mx-auto lg:mx-0 text-center lg:text-left">
+            <div class="flex items-center gap-2.5 justify-center lg:justify-start mb-9">
+                <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                 </div>
-                <div>
-                    <h1 class="text-2xl font-bold fg-0 tracking-tight">InvestorHub</h1>
-                </div>
+                <span class="text-[17px] font-semibold fg-0 tracking-tight">InvestorHub</span>
             </div>
-            <h2 class="text-xl md:text-2xl font-bold fg-0 mb-3 leading-tight">Your stock<br>research desk</h2>
-            <p class="text-sm fg-2 mb-6 leading-relaxed">Free, open-source stock analytics with institutional-grade tools. No paywall, no upsells — just deep analysis.</p>
+            <h1 class="text-[2rem] md:text-[2.6rem] font-bold fg-0 tracking-tight leading-[1.08] mb-4">Make informed<br class="hidden sm:block"> investing decisions.</h1>
+            <p class="text-[15px] fg-2 leading-relaxed mb-9 max-w-md mx-auto lg:mx-0">A fast, free research workspace — fair-value estimates, analyst consensus, fundamentals, technicals and live portfolio tracking, all in one place.</p>
 
-            <!-- Backend status indicator -->
-            <div x-show="backendWaking" class="mb-5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center gap-2.5">
-                <div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#f59e0b"></div>
-                <span class="text-xs text-amber-400 font-medium">Connecting to the server — this can take up to a minute on the first visit...</span>
-            </div>
-            <div x-show="!backendWaking && !connectionError" x-cloak class="mb-5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2.5">
-                <div class="dot-pulse"></div>
-                <span class="text-xs text-emerald-400 font-medium">Server ready</span>
-            </div>
+            <ul class="space-y-3.5 text-left max-w-md mx-auto lg:mx-0">
+                <template x-for="f in [
+                    {t:'Fair value & analyst consensus',d:'Upside, price targets and the buy / hold / sell split.'},
+                    {t:'Deep fundamentals',d:'10-year financials, margins, cash flow and a 5-factor health score.'},
+                    {t:'Live portfolio tracking',d:'P&L, dividend income, sector mix and performance vs. the S&P 500.'},
+                    {t:'Charts & SEC filings',d:'Candlesticks with RSI / MACD, plus one-click EDGAR filings.'}
+                ]" :key="f.t">
+                    <li class="flex gap-3">
+                        <svg class="w-[18px] h-[18px] text-brand-500 mt-px flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-[13.5px] fg-1 leading-snug"><span class="font-semibold fg-0" x-text="f.t"></span> — <span x-text="f.d"></span></span>
+                    </li>
+                </template>
+            </ul>
 
-            <div class="grid grid-cols-2 gap-3 text-left">
-                <div class="bg-inset rounded-xl p-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        <span class="text-[11px] font-bold fg-0">Interactive Charts</span>
-                    </div>
-                    <p class="text-[10px] fg-3 leading-snug">Candlestick price charts plus RSI, MACD, moving averages & Bollinger Bands</p>
+            <div class="mt-8 flex items-center gap-2 justify-center lg:justify-start">
+                <div x-show="backendWaking" class="flex items-center gap-2">
+                    <div class="spinner" style="width:13px;height:13px;border-width:2px;border-top-color:#f59e0b"></div>
+                    <span class="text-[11px] text-amber-500 font-medium">Waking the server — up to a minute on first visit…</span>
                 </div>
-                <div class="bg-inset rounded-xl p-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        <span class="text-[11px] font-bold fg-0">Stock Scorer</span>
-                    </div>
-                    <p class="text-[10px] fg-3 leading-snug">5-factor health score: profitability, growth, valuation, financial health, momentum</p>
-                </div>
-                <div class="bg-inset rounded-xl p-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
-                        <span class="text-[11px] font-bold fg-0">Stock Compare</span>
-                    </div>
-                    <p class="text-[10px] fg-3 leading-snug">Compare up to 5 stocks side by side with metrics tables & a strengths radar</p>
-                </div>
-                <div class="bg-inset rounded-xl p-3">
-                    <div class="flex items-center gap-2 mb-1.5">
-                        <svg class="w-4 h-4 text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        <span class="text-[11px] font-bold fg-0">SEC Filings</span>
-                    </div>
-                    <p class="text-[10px] fg-3 leading-snug">Direct EDGAR integration — 10-K, 10-Q, 8-K filings with one click</p>
+                <div x-show="!backendWaking && !connectionError" x-cloak class="flex items-center gap-2">
+                    <div class="dot-pulse"></div>
+                    <span class="text-[11px] fg-3 font-medium">Live market data ready</span>
                 </div>
             </div>
-            <p class="text-[10px] fg-3 mt-4 hidden md:block">Also: full financial statements, fundamentals charts, sector peers, portfolio tracking with P&L, watchlist, CSV export, and more.</p>
         </div>
 
-        <!-- Right: Auth Forms -->
-        <div class="w-full max-w-sm flex-shrink-0">
-            <!-- Login Form -->
-            <div x-show="authPage==='login'" class="card p-6 fade">
-                <h2 class="text-base font-bold fg-0 text-center mb-5">Welcome Back</h2>
-                <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-                <div class="space-y-3">
-                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+        <!-- Auth card -->
+        <div class="w-full max-w-[400px] mx-auto">
+            <div class="card p-7 fade">
+                <div class="pill-bar grid grid-cols-2 mb-6">
+                    <button @click="authError='';authPage='login'" :class="authPage==='login'?'on':''" class="pill text-center">Sign in</button>
+                    <button @click="authError='';authPage='register'" :class="authPage==='register'?'on':''" class="pill text-center">Create account</button>
                 </div>
-                <button @click="login()" :disabled="authLoading||backendWaking" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Signing in...':backendWaking?'Waiting for server...':'Sign In'"></button>
-                <div class="text-center mt-4"><span class="text-[12px] fg-3">Don't have an account?</span> <button @click="authError='';authPage='register'" class="text-[12px] text-brand-400 font-medium">Create account</button></div>
-            </div>
-            <!-- Register Form -->
-            <div x-show="authPage==='register'" class="card p-6 fade">
-                <h2 class="text-base font-bold fg-0 text-center mb-5">Create Account</h2>
-                <div x-show="authError" class="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 font-medium" x-text="authError"></div>
-                <div class="space-y-3">
-                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
-                    <div><label class="text-[11px] fg-3 font-medium block mb-1">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="Min 6 chars" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f"></div>
+                <div x-show="authError" x-cloak class="mb-4 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-500 font-medium" x-text="authError"></div>
+
+                <!-- Login -->
+                <div x-show="authPage==='login'" class="space-y-3.5">
+                    <div><label class="text-[11px] fg-2 font-medium block mb-1.5">Email</label><input type="email" x-model="loginForm.email" @keydown.enter="login()" placeholder="you@email.com" class="w-full px-3.5 py-2.5 rounded-lg text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-2 font-medium block mb-1.5">Password</label><input type="password" x-model="loginForm.password" @keydown.enter="login()" placeholder="••••••••" class="w-full px-3.5 py-2.5 rounded-lg text-sm input-f"></div>
+                    <button @click="login()" :disabled="authLoading||backendWaking" class="w-full mt-1 px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed" x-text="authLoading?'Signing in…':backendWaking?'Waiting for server…':'Sign in'"></button>
                 </div>
-                <button @click="register()" :disabled="authLoading||backendWaking" class="w-full mt-4 px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50" x-text="authLoading?'Creating account...':backendWaking?'Waiting for server...':'Create Account'"></button>
-                <div class="text-center mt-4"><span class="text-[12px] fg-3">Already have an account?</span> <button @click="authError='';authPage='login'" class="text-[12px] text-brand-400 font-medium">Sign in</button></div>
+
+                <!-- Register -->
+                <div x-show="authPage==='register'" class="space-y-3.5">
+                    <div><label class="text-[11px] fg-2 font-medium block mb-1.5">Name</label><input type="text" x-model="registerForm.name" placeholder="Your name" class="w-full px-3.5 py-2.5 rounded-lg text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-2 font-medium block mb-1.5">Email</label><input type="email" x-model="registerForm.email" placeholder="you@email.com" class="w-full px-3.5 py-2.5 rounded-lg text-sm input-f"></div>
+                    <div><label class="text-[11px] fg-2 font-medium block mb-1.5">Password</label><input type="password" x-model="registerForm.password" @keydown.enter="register()" placeholder="At least 6 characters" class="w-full px-3.5 py-2.5 rounded-lg text-sm input-f"></div>
+                    <button @click="register()" :disabled="authLoading||backendWaking" class="w-full mt-1 px-4 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 transition disabled:opacity-50 disabled:cursor-not-allowed" x-text="authLoading?'Creating account…':backendWaking?'Waiting for server…':'Create account'"></button>
+                </div>
+
+                <p class="text-[11px] fg-3 text-center mt-5 flex items-center justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    Your portfolio &amp; watchlist are saved to your account
+                </p>
             </div>
-            <p class="text-[10px] fg-3 text-center mt-3">Your portfolio and watchlist are saved to your account.</p>
+            <p class="text-center text-[11px] fg-3 mt-4">Free · No ads · Your data stays private</p>
         </div>
     </div>
 </div>
@@ -218,13 +202,10 @@
 <aside class="side w-[252px] bg-card border-r flex flex-col flex-shrink-0" style="border-color:var(--border)">
     <div class="px-5 py-4" style="border-bottom:1px solid var(--border)">
         <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/25">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+                <svg class="w-[18px] h-[18px] text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
-            <div>
-                <h1 class="text-[15px] font-bold fg-0 tracking-tight">InvestorHub</h1>
-                <p class="text-[9px] fg-3 uppercase tracking-[.2em] mt-px">Analytics Platform</p>
-            </div>
+            <h1 class="text-[15px] font-semibold fg-0 tracking-tight">InvestorHub</h1>
         </div>
     </div>
     <nav class="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
@@ -244,7 +225,7 @@
             <button @click="showRegisterModal=true" class="w-full px-3 py-2 fg-2 border rounded-[10px] text-[13px] font-medium hover:bg-[var(--bg-2)] transition" style="border-color:var(--border)">Create Account</button>
         </div>
         <div x-show="authToken" x-cloak class="flex items-center gap-2.5">
-            <div class="w-8 h-8 bg-gradient-to-br from-brand-500 to-violet-600 rounded-full flex items-center justify-center text-white text-xs font-bold" x-text="(currentUser?.name||currentUser?.email||'U').charAt(0).toUpperCase()"></div>
+            <div class="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-white text-xs font-bold" x-text="(currentUser?.name||currentUser?.email||'U').charAt(0).toUpperCase()"></div>
             <div class="flex-1 min-w-0">
                 <div class="text-[12px] font-semibold fg-0 truncate" x-text="currentUser?.name||currentUser?.email"></div>
                 <button @click="logout()" class="text-[10px] text-red-400 hover:text-red-300 font-medium">Sign Out</button>
@@ -424,7 +405,7 @@
 
         <div class="flex items-center gap-3 mb-6">
             <input type="text" x-model="analysisSymbol" @keydown.enter="loadAnalysis(analysisSymbol)" placeholder="Ticker e.g. AAPL" class="px-4 py-2.5 rounded-[10px] text-sm input-f w-44 uppercase" style="text-transform:uppercase">
-            <button @click="loadAnalysis(analysisSymbol)" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Analyze</button>
+            <button @click="loadAnalysis(analysisSymbol)" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Analyze</button>
             <div x-show="analysisLoading" class="spinner"></div>
         </div>
 
@@ -440,7 +421,7 @@
             <div class="card stock-hdr p-6 mb-4">
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                     <div class="flex items-center gap-5">
-                        <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-lg" :style="'background:linear-gradient(135deg,'+scoreColor(stockScore?.overallScore||5)+'22,'+scoreColor(stockScore?.overallScore||5)+'08)'" x-data="{lvl:0}">
+                        <div class="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden bg-inset border bdr-t" x-data="{lvl:0}">
                             <img x-show="lvl===0" :src="logoUrl(analysisData?.symbol)" @error="lvl=1" loading="lazy" class="w-full h-full object-contain">
                             <img x-show="lvl===1" :src="logoFallback(analysisData?.symbol)" @error="lvl=2" loading="lazy" class="w-full h-full object-contain p-1.5">
                             <span x-show="lvl===2" x-text="analysisData?.symbol?.charAt(0)" class="text-2xl font-bold" :style="'color:'+scoreColor(stockScore?.overallScore||5)"></span>
@@ -490,9 +471,7 @@
                                         :stroke="scoreColor(stockScore?.overallScore)"
                                         :stroke-dasharray="263.9"
                                         :stroke-dashoffset="263.9-(263.9*(stockScore?.overallScore||0)/10)"
-                                        stroke-linecap="round"
-                                        style="filter:drop-shadow(0 0 6px var(--glow,transparent))"
-                                        :style="'--glow:'+scoreColor(stockScore?.overallScore)+'44'"/>
+                                        stroke-linecap="round"/>
                                 </svg>
                                 <span class="rv text-3xl font-extrabold fg-0" x-text="stockScore?.overallScore?.toFixed(1)"></span>
                             </div>
@@ -816,7 +795,7 @@
                             <template x-for="(f,i) in secFilings?.filings||[]" :key="i">
                                 <a :href="f.url" target="_blank" rel="noopener" class="flex items-center gap-4 px-4 py-3 hover:bg-[var(--bg-2)] transition" style="border-bottom:1px solid var(--border-s)">
                                     <span class="text-[11px] font-bold px-2.5 py-1 rounded-md flex-shrink-0 min-w-[60px] text-center"
-                                        :class="f.form==='10-K'?'bg-brand-500/10 text-brand-400':f.form==='10-Q'?'bg-cyan-500/10 text-cyan-400':f.form==='8-K'?'bg-amber-500/10 text-amber-400':f.form==='DEF 14A'?'bg-violet-500/10 text-violet-400':'bg-[var(--bg-2)] fg-2'"
+                                        :class="f.form==='10-K'?'bg-brand-500/10 text-brand-400':f.form==='10-Q'?'bg-cyan-500/10 text-cyan-400':f.form==='8-K'?'bg-amber-500/10 text-amber-400':f.form==='DEF 14A'?'bg-[var(--bg-3)] fg-2':'bg-[var(--bg-2)] fg-2'"
                                         x-text="f.form"></span>
                                     <div class="flex-1 min-w-0">
                                         <div class="text-[13px] font-medium fg-0 truncate" x-text="f.description||f.form"></div>
@@ -850,7 +829,7 @@
                                 <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                             </a>
                             <a :href="edgarUrl(analysisData?.symbol,'DEF 14A')" target="_blank" rel="noopener" class="flex items-center gap-3 p-3 rounded-xl bg-inset hover:bg-[var(--bg-3)] transition group">
-                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-violet-500/10 text-violet-400 min-w-[60px] text-center">DEF 14A</span>
+                                <span class="text-[11px] font-bold px-2.5 py-1 rounded-md bg-[var(--bg-3)] fg-2 min-w-[60px] text-center">DEF 14A</span>
                                 <div class="flex-1"><div class="text-[13px] font-medium fg-0">Proxy Statements</div><div class="text-[11px] fg-3">Shareholder meeting & voting info</div></div>
                                 <svg class="w-4 h-4 fg-3 group-hover:text-brand-400 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                             </a>
@@ -924,7 +903,7 @@
             <div class="flex flex-wrap items-end gap-3">
                 <div class="flex-1 min-w-[180px]"><label class="text-[11px] fg-3 font-medium block mb-1">Tickers</label><input type="text" x-model="compareInput" @keydown.enter="loadCompare()" placeholder="AAPL, MSFT, GOOGL" class="w-full px-4 py-2.5 rounded-[10px] text-sm input-f"></div>
                 <div><label class="text-[11px] fg-3 font-medium block mb-1">Period</label><select x-model="comparePeriod" class="px-3 py-2.5 rounded-[10px] text-sm input-f"><option value="1mo">1M</option><option value="3mo">3M</option><option value="6mo">6M</option><option value="1y" selected>1Y</option><option value="2y">2Y</option><option value="5y">5Y</option></select></div>
-                <button @click="loadCompare()" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25">Compare</button>
+                <button @click="loadCompare()" class="px-5 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Compare</button>
                 <button x-show="compareData&&Object.keys(compareData||{}).length" @click="exportCompareCSV()" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
                 <div x-show="compareLoading" class="spinner"></div>
             </div>
@@ -968,7 +947,7 @@
             <div class="flex items-center gap-2">
                 <button @click="exportPortfolioCSV()" x-show="portfolio.length" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
 
-                <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition shadow-sm shadow-brand-600/25 flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
+                <button @click="showAddHolding=true" class="px-4 py-2.5 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>Add</button>
             </div>
         </div>
         <div x-show="portfolio.length" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -999,7 +978,7 @@
                     <template x-for="s in portfolioAnalytics?.sectorAllocation||[]" :key="s.sector">
                         <div class="flex items-center gap-3">
                             <span class="text-[12px] fg-1 w-32 md:w-40 truncate flex-shrink-0" x-text="s.sector"></span>
-                            <div class="flex-1 score-bar"><div class="fill" :style="'width:'+s.pct+'%;background:#6366f1'"></div></div>
+                            <div class="flex-1 score-bar"><div class="fill" :style="'width:'+s.pct+'%;background:#2563eb'"></div></div>
                             <span class="text-[12px] fg-0 font-semibold w-12 text-right tabular-nums flex-shrink-0" x-text="s.pct+'%'"></span>
                             <span class="text-[11px] fg-3 w-20 text-right tabular-nums flex-shrink-0 hidden sm:inline" x-text="'$'+s.value.toLocaleString('en-US',{maximumFractionDigits:0})"></span>
                         </div>
