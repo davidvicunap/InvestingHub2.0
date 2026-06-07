@@ -537,6 +537,182 @@ def api_fundamentals(symbol):
         return jsonify({"error": "Failed to fetch fundamentals"}), 500
 
 
+# -- API: Metrics time-series (Charting page) ---------------------------------
+
+# Per-metric metadata: label, unit (drives axis/tooltip formatting), and group
+# (organizes the sidebar picker). Kept server-side so the frontend stays dumb.
+_METRIC_META = {
+    "revenue":         ("Revenue", "$M", "Income Statement"),
+    "grossProfit":     ("Gross Profit", "$M", "Income Statement"),
+    "operatingIncome": ("Operating Income", "$M", "Income Statement"),
+    "netIncome":       ("Net Income", "$M", "Income Statement"),
+    "eps":             ("Diluted EPS", "$", "Per Share"),
+    "grossMargin":     ("Gross Margin", "%", "Margins"),
+    "operatingMargin": ("Operating Margin", "%", "Margins"),
+    "netMargin":       ("Net Margin", "%", "Margins"),
+    "currentRatio":    ("Current Ratio", "x", "Liquidity & Leverage"),
+    "debtToEquity":    ("Debt / Equity", "x", "Liquidity & Leverage"),
+    "roe":             ("Return on Equity", "%", "Returns"),
+    "roa":             ("Return on Assets", "%", "Returns"),
+    "operatingCashFlow": ("Operating Cash Flow", "$M", "Cash Flow"),
+    "freeCashFlow":    ("Free Cash Flow", "$M", "Cash Flow"),
+    "pe":              ("P/E (period-end)", "x", "Valuation"),
+}
+
+
+@app.route("/api/metrics/<symbol>")
+@cache_response(3600)
+def api_metrics(symbol):
+    """Time-series of fundamental KPIs/ratios for the Charting page.
+
+    Returns every metric aligned to a single ascending `periods` axis so the
+    frontend can plot any combination on one chart and compute moving averages
+    / YoY growth client-side. `freq=quarterly` uses quarterly statements.
+    """
+    quarterly = request.args.get("freq", "annual").lower().startswith("q")
+    try:
+        t = get_ticker(symbol)
+        if quarterly:
+            inc, bal, cf = t.quarterly_financials, t.quarterly_balance_sheet, t.quarterly_cashflow
+        else:
+            inc, bal, cf = t.financials, t.balance_sheet, t.cashflow
+
+        def cols(df):
+            return list(df.columns) if df is not None and not df.empty else []
+
+        all_dates = sorted(set(cols(inc)) | set(cols(bal)) | set(cols(cf)))
+        if not all_dates:
+            return jsonify({"error": "No financial data available"}), 404
+
+        def row(df, names):
+            """First matching line item as {date: value}; {} if none present."""
+            if df is None or df.empty:
+                return {}
+            for n in names:
+                if n in df.index:
+                    s = df.loc[n]
+                    if isinstance(s, pd.DataFrame):  # duplicate index guard
+                        s = s.iloc[0]
+                    return {d: (float(s[d]) if d in s.index and pd.notna(s[d]) else None) for d in all_dates}
+            return {}
+
+        revenue   = row(inc, ["Total Revenue", "Revenue", "Operating Revenue"])
+        grossProf = row(inc, ["Gross Profit"])
+        costRev   = row(inc, ["Cost Of Revenue", "Cost Of Goods Sold"])
+        opIncome  = row(inc, ["Operating Income", "Total Operating Income As Reported"])
+        netIncome = row(inc, ["Net Income", "Net Income Common Stockholders", "Net Income Continuous Operations"])
+        eps       = row(inc, ["Diluted EPS", "Basic EPS"])
+        curAssets = row(bal, ["Current Assets", "Total Current Assets"])
+        curLiab   = row(bal, ["Current Liabilities", "Total Current Liabilities"])
+        totDebt   = row(bal, ["Total Debt"])
+        ltDebt    = row(bal, ["Long Term Debt"])
+        equity    = row(bal, ["Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity"])
+        totAssets = row(bal, ["Total Assets"])
+        opCF      = row(cf, ["Operating Cash Flow", "Total Cash From Operating Activities", "Cash Flow From Continuing Operating Activities"])
+        capex     = row(cf, ["Capital Expenditure", "Capital Expenditures"])
+        fcfRow    = row(cf, ["Free Cash Flow"])
+
+        def millions(dct):
+            return [round(dct[d] / 1e6, 2) if dct.get(d) is not None else None for d in all_dates]
+
+        def each(fn):
+            out = []
+            for d in all_dates:
+                try:
+                    out.append(fn(d))
+                except Exception:
+                    out.append(None)
+            return out
+
+        def margin(num, d):
+            r = revenue.get(d)
+            n = num.get(d)
+            return round(n / r * 100, 2) if (n is not None and r) else None
+
+        def gross_margin(d):
+            r = revenue.get(d)
+            if not r:
+                return None
+            gp = grossProf.get(d)
+            if gp is None and costRev.get(d) is not None:
+                gp = r - costRev[d]
+            return round(gp / r * 100, 2) if gp is not None else None
+
+        def ratio(num, den, d, scale=1, nd=2):
+            a, b = num.get(d), den.get(d)
+            return round(a / b * scale, nd) if (a is not None and b) else None
+
+        def fcf(d):
+            if fcfRow.get(d) is not None:
+                return round(fcfRow[d] / 1e6, 2)
+            if opCF.get(d) is not None and capex.get(d) is not None:
+                return round((opCF[d] + capex[d]) / 1e6, 2)  # capex is negative in yfinance
+            return None
+
+        # P/E (period-end): align each statement date to the prior monthly close,
+        # using TTM EPS for quarterly periods. Best-effort — null on any gap.
+        pe = [None] * len(all_dates)
+        try:
+            hist = t.history(period="10y", interval="1mo")
+            if hist is not None and not hist.empty and "Close" in hist:
+                closes = [(idx.date(), float(c)) for idx, c in hist["Close"].items() if pd.notna(c)]
+                eps_dates = sorted(d for d in all_dates if eps.get(d) is not None)
+                for i, d in enumerate(all_dates):
+                    if quarterly:  # trailing-twelve-month EPS = this + prior 3 quarters
+                        seq = [eps[x] for x in all_dates if x <= d and eps.get(x) is not None][-4:]
+                        eps_val = sum(seq) if len(seq) == 4 else None
+                    else:
+                        eps_val = eps.get(d)
+                    if not eps_val or eps_val <= 0:
+                        continue
+                    prior = [c for (cd, c) in closes if cd <= d.date()]
+                    if prior:
+                        pe[i] = round(prior[-1] / eps_val, 2)
+        except Exception:
+            pass
+
+        raw = {
+            "revenue": millions(revenue),
+            "grossProfit": millions(grossProf),
+            "operatingIncome": millions(opIncome),
+            "netIncome": millions(netIncome),
+            "eps": [round(eps[d], 2) if eps.get(d) is not None else None for d in all_dates],
+            "grossMargin": each(gross_margin),
+            "operatingMargin": each(lambda d: margin(opIncome, d)),
+            "netMargin": each(lambda d: margin(netIncome, d)),
+            "currentRatio": each(lambda d: ratio(curAssets, curLiab, d)),
+            "debtToEquity": each(lambda d: ratio(totDebt if totDebt else ltDebt, equity, d)),
+            "roe": each(lambda d: ratio(netIncome, equity, d, scale=100)),
+            "roa": each(lambda d: ratio(netIncome, totAssets, d, scale=100)),
+            "operatingCashFlow": millions(opCF),
+            "freeCashFlow": each(fcf),
+            "pe": pe,
+        }
+
+        # Drop periods with no data at all (yfinance often pads a sparse oldest
+        # column) so charts don't open on an empty gap.
+        keep = [i for i in range(len(all_dates))
+                if any(vals[i] is not None for vals in raw.values())]
+        period_labels = [all_dates[i].strftime("%Y-%m-%d") for i in keep]
+
+        # Drop metrics that are entirely empty so the picker only shows usable ones.
+        metrics = {}
+        for key, vals in raw.items():
+            kept = [vals[i] for i in keep]
+            if any(v is not None for v in kept):
+                label, unit, group = _METRIC_META[key]
+                metrics[key] = {"label": label, "unit": unit, "group": group, "data": kept}
+
+        return jsonify({
+            "symbol": symbol.upper(),
+            "frequency": "quarterly" if quarterly else "annual",
+            "periods": period_labels,
+            "metrics": metrics,
+        })
+    except Exception:
+        return jsonify({"error": "Failed to fetch metrics"}), 500
+
+
 # -- API: Market Overview -----------------------------------------------------
 
 @app.route("/api/market")

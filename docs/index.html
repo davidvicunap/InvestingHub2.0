@@ -987,6 +987,136 @@
         </div>
     </div>
 
+    <!-- ───────── CHARTING ───────── -->
+    <div x-show="currentPage==='charting'" x-cloak class="fade">
+        <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
+            <div>
+                <h2 class="text-xl md:text-2xl font-bold fg-0">Charting</h2>
+                <p class="text-[13px] fg-2 mt-0.5">Plot fundamentals &amp; valuation ratios over time</p>
+            </div>
+            <form @submit.prevent="loadMetrics(chartingInput)" class="flex items-center gap-2" role="search">
+                <label for="charting-ticker" class="sr-only">Company ticker</label>
+                <input id="charting-ticker" x-model="chartingInput" type="text" autocomplete="off" placeholder="Ticker — e.g. AAPL" class="w-44 px-3.5 py-2 rounded-[10px] text-sm input-f uppercase" style="text-transform:uppercase">
+                <button type="submit" class="px-4 py-2 bg-brand-600 text-white rounded-[10px] text-sm font-semibold hover:bg-brand-700 transition">Load</button>
+            </form>
+        </div>
+
+        <!-- Empty state -->
+        <div x-show="!chartingSymbol && !metricsLoading" class="card p-10 md:p-14 text-center">
+            <div class="w-12 h-12 mx-auto mb-4 rounded-xl bg-brand-500/10 flex items-center justify-center">
+                <svg aria-hidden="true" class="w-6 h-6 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l3-3 3 2 5-6"/></svg>
+            </div>
+            <h3 class="text-base font-semibold fg-0 mb-1">Enter a ticker to start charting</h3>
+            <p class="text-[13px] fg-2 mb-5 max-w-sm mx-auto">Compare revenue, margins, returns and valuation ratios across years or quarters.</p>
+            <div role="alert" x-show="chartError" x-cloak class="mb-4 text-xs text-red-500 font-medium" x-text="chartError"></div>
+            <div class="flex items-center justify-center gap-1.5 flex-wrap">
+                <span class="text-[11px] fg-3 mr-1">Try:</span>
+                <template x-for="s in chartingExamples" :key="s">
+                    <button @click="loadMetrics(s)" class="px-2.5 py-1 rounded-full bg-inset text-[12px] font-semibold fg-1 hover:bg-[var(--bg-3)] transition" x-text="s"></button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div x-show="metricsLoading" class="card p-16 flex items-center justify-center"><div class="spinner"></div></div>
+
+        <!-- Dashboard: sidebar + canvas. x-if (not x-show) so the child bindings
+             that dereference metricsData aren't evaluated until data is loaded. -->
+        <template x-if="chartingSymbol && !metricsLoading && metricsData">
+        <div class="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-5">
+            <!-- Controls sidebar -->
+            <aside class="card p-4 h-fit lg:sticky lg:top-[68px] space-y-5">
+                <div>
+                    <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-2">Frequency</div>
+                    <div class="pill-bar grid grid-cols-2">
+                        <button class="pill" :class="chartFreq==='annual'?'on':''" @click="setChartFreq('annual')">Annual</button>
+                        <button class="pill" :class="chartFreq==='quarterly'?'on':''" @click="setChartFreq('quarterly')">Quarterly</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-2">Time horizon</div>
+                    <div class="pill-bar flex">
+                        <template x-for="r in chartRanges()" :key="r.l"><button class="pill flex-1" :class="chartRange===r.n?'on':''" @click="setChartRange(r.n)" x-text="r.l"></button></template>
+                    </div>
+                </div>
+                <div>
+                    <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-2">Transform</div>
+                    <div class="pill-bar grid grid-cols-3">
+                        <button class="pill" :class="chartOverlay==='none'?'on':''" @click="setOverlay('none')">Raw</button>
+                        <button class="pill" :class="chartOverlay==='yoy'?'on':''" @click="setOverlay('yoy')" title="Year-over-year growth">YoY&nbsp;%</button>
+                        <button class="pill" :class="chartOverlay==='sma'?'on':''" @click="setOverlay('sma')" title="Moving average overlay">Avg</button>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] fg-3 uppercase tracking-wider font-semibold">Metrics</span>
+                        <span class="text-[10px] fg-3" x-text="selectedMetrics.length+' / 4'"></span>
+                    </div>
+                    <div class="space-y-3 max-h-[440px] overflow-y-auto pr-1 -mr-1">
+                        <template x-for="grp in metricGroups()" :key="grp.name">
+                            <div>
+                                <div class="text-[10px] fg-3 font-semibold uppercase tracking-wide mb-1" x-text="grp.name"></div>
+                                <div class="space-y-px">
+                                    <template x-for="m in grp.items" :key="m.key">
+                                        <label class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[var(--bg-2)] transition text-[13px]"
+                                            :class="selectedMetrics.includes(m.key)?'fg-0 font-medium':'fg-2'">
+                                            <input type="checkbox" :checked="selectedMetrics.includes(m.key)" @change="toggleMetric(m.key)"
+                                                :disabled="!selectedMetrics.includes(m.key) && selectedMetrics.length>=4" class="accent-brand-600 w-3.5 h-3.5">
+                                            <span x-text="m.label"></span>
+                                            <span class="ml-auto text-[10px] fg-3" x-text="m.unit"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Chart + table canvas -->
+            <div class="space-y-5 min-w-0">
+                <div class="card p-4 md:p-5">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="logo-wrap" x-data="{lvl:0}">
+                            <img x-show="lvl===0" :src="logoUrl(metricsData.symbol)" @error="lvl=1" loading="lazy" alt="" class="w-full h-full object-contain">
+                            <img x-show="lvl===1" :src="logoFallback(metricsData.symbol)" @error="lvl=2" loading="lazy" alt="" class="w-full h-full object-contain p-1.5">
+                            <span x-show="lvl===2" x-text="metricsData.symbol.charAt(0)"></span>
+                        </div>
+                        <div>
+                            <div class="font-bold fg-0 leading-tight" x-text="metricsData.symbol"></div>
+                            <div class="text-[11px] fg-3" x-text="(metricsData.frequency==='annual'?'Annual':'Quarterly')+' · '+(chartOverlay==='yoy'?'year-over-year growth':chartOverlay==='sma'?'with moving average':'reported values')"></div>
+                        </div>
+                    </div>
+                    <div id="metric-chart" role="img" aria-label="Financial metrics chart" class="min-h-[430px]"></div>
+                    <div x-show="!selectedMetrics.length" class="text-center fg-3 text-sm py-12">Select one or more metrics from the left to plot.</div>
+                </div>
+
+                <!-- Summary table (raw data verification) -->
+                <div class="card p-4 md:p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-[11px] fg-3 uppercase tracking-wider font-semibold">Summary data</span>
+                        <span class="text-[10px] fg-3" x-show="chartOverlay==='yoy'">showing YoY %</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="ft" x-show="selectedMetrics.length">
+                            <thead><tr><th>Metric</th><template x-for="p in chartPeriodLabels()" :key="p"><th x-text="p"></th></template></tr></thead>
+                            <tbody>
+                                <template x-for="key in selectedMetrics" :key="key">
+                                    <tr>
+                                        <td x-text="metricsData.metrics[key].label"></td>
+                                        <template x-for="(v,i) in chartSeriesData(key)" :key="i"><td x-text="fmtMetricVal(v, chartOverlay==='yoy'?'%':metricsData.metrics[key].unit)"></td></template>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p x-show="!selectedMetrics.length" class="text-sm fg-3 text-center py-6">No metrics selected.</p>
+                </div>
+            </div>
+        </div>
+        </template>
+    </div>
+
     <!-- ───────── PORTFOLIO ───────── -->
     <div x-show="currentPage==='portfolio'" x-cloak class="fade">
         <div class="flex items-center justify-between mb-5">

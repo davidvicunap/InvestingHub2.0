@@ -31,6 +31,7 @@ function app() {
             {id:'dashboard',label:'Dashboard',icon:'<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>'},
             {id:'analysis',label:'Analysis',icon:'<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>'},
             {id:'compare',label:'Compare',icon:'<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>'},
+            {id:'charting',label:'Charting',icon:'<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M7 14l3-3 3 2 5-6"/></svg>'},
             {id:'portfolio',label:'Portfolio',icon:'<svg aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>'},
         ],
 
@@ -75,10 +76,17 @@ function app() {
 
         peerData:null, peerLoading:false,
 
+        // ── Charting page ──
+        chartingSymbol:'', chartingInput:'', metricsData:null, metricsLoading:false, chartError:'',
+        chartFreq:'annual', chartRange:99, chartOverlay:'none',
+        selectedMetrics:['revenue','netMargin'],
+        metricColors:['#2563eb','#10b981','#f59e0b','#8b5cf6'],
+        chartingExamples:['AAPL','MSFT','GOOGL','NVDA','AMZN'],
+
         apex:{}, tv:{},
         _apiCache:{},
         _cacheTTLs:{'/api/market':60,'/api/watchlist':30,'/api/portfolio':30,'/api/portfolio/analytics':30,'/api/movers':120},
-        _cachePrefixTTLs:[['/api/quote/',60],['/api/history/',600],['/api/technicals/',300],['/api/fundamentals/',3600],['/api/score/',1800],['/api/sec-filings/',3600],['/api/peers/',1800],['/api/compare?',300],['/api/returns/',600],['/api/dividends/',3600],['/api/analysts/',1800],['/api/valuation/',1800],['/api/earnings/',3600]],
+        _cachePrefixTTLs:[['/api/quote/',60],['/api/history/',600],['/api/technicals/',300],['/api/fundamentals/',3600],['/api/score/',1800],['/api/sec-filings/',3600],['/api/peers/',1800],['/api/compare?',300],['/api/returns/',600],['/api/dividends/',3600],['/api/analysts/',1800],['/api/valuation/',1800],['/api/earnings/',3600],['/api/metrics/',3600]],
 
         init() {
             this.applyTheme();
@@ -148,10 +156,10 @@ function app() {
         toggleTheme(){this.darkMode=!this.darkMode;this.applyTheme();localStorage.setItem('investorhub-theme',this.darkMode?'dark':'light');this.reRender()},
         applyTheme(){document.documentElement.classList.toggle('dark',this.darkMode)},
         tc(){return this.darkMode?{bg:'#0f1729',grid:'#1e293b',text:'#94a3b8',cross:'#475569',border:'#334155',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e2e8f0',am:'dark',ag:'#1e293b',at:'#94a3b8'}:{bg:'#fff',grid:'#f1f5f9',text:'#64748b',cross:'#94a3b8',border:'#e2e8f0',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#334155',am:'light',ag:'#f1f5f9',at:'#64748b'}},
-        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Overview')this.renderEarningsChart();if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(this.analysisTab==='Dividends')this.renderDividendChart()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.currentPage==='portfolio'){if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()}if(this.currentPage==='dashboard'&&this.portfolio.length)this.renderPortCharts()},
+        reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Overview')this.renderEarningsChart();if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(this.analysisTab==='Dividends')this.renderDividendChart()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.currentPage==='portfolio'){if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()}if(this.currentPage==='dashboard'&&this.portfolio.length)this.renderPortCharts();if(this.currentPage==='charting'&&this.metricsData)this.renderMetricChart()},
 
         // ── Nav ──
-        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio();this.loadMovers()}if(p==='portfolio'){this.loadPortfolioAnalytics();this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()})}},
+        navigate(p){this.currentPage=p;if(p==='dashboard'){this.loadMarketData();this.loadWatchlist();this.loadPortfolio();this.loadMovers()}if(p==='portfolio'){this.loadPortfolioAnalytics();this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()})}if(p==='charting'&&this.metricsData)this.$nextTick(()=>this.renderMetricChart())},
         selectStock(s){if(!s)return;this.analysisSymbol=s;this.currentPage='analysis';this.loadAnalysis(s)},
         switchTab(t){this.analysisTab=t;const s=this.analysisData?.symbol;this.$nextTick(()=>{if(t==='Overview')this.renderEarningsChart();if(t==='Chart')this.loadPriceChart();if(t==='Technicals')this.loadTech();if(t==='Fundamentals'){this.fundamentalsData?this.renderFundCharts():this.loadFundamentals(s)}if(t==='Financials'&&!this.fundamentalsData)this.loadFundamentals(s);if(t==='Dividends'){this.dividendData?this.renderDividendChart():this.loadDividends(s)}if(t==='SEC Filings'&&!this.secFilings)this.loadSecFilings(s)})},
 
@@ -407,5 +415,90 @@ function app() {
 
         // ── Apex ──
         renderApex(id,opts){if(typeof ApexCharts==='undefined')return;if(this.apex[id]){this.apex[id].destroy();delete this.apex[id]}const el=document.getElementById(id);if(!el)return;el.innerHTML='';const ch=new ApexCharts(el,opts);ch.render();this.apex[id]=ch},
+
+        // ── Charting page ──────────────────────────────────────────────────
+        async loadMetrics(sym){
+            sym=(sym||'').trim().toUpperCase();
+            if(!sym)return;
+            this.chartingSymbol=sym; this.chartingInput=sym; this.chartError=''; this.metricsLoading=true; this.metricsData=null;
+            try{
+                const d=await this.api(`/api/metrics/${encodeURIComponent(sym)}?freq=${this.chartFreq}`);
+                if(!d||d.error||!d.metrics||!Object.keys(d.metrics).length){
+                    this.metricsData=null; this.chartingSymbol=''; this.chartError=`No financial data found for "${sym}".`;
+                }else{
+                    this.metricsData=d;
+                    const avail=Object.keys(d.metrics);
+                    this.selectedMetrics=this.selectedMetrics.filter(k=>avail.includes(k));
+                    if(!this.selectedMetrics.length)this.selectedMetrics=['revenue','netMargin'].filter(k=>avail.includes(k));
+                    if(!this.selectedMetrics.length)this.selectedMetrics=avail.slice(0,2);
+                    this.$nextTick(()=>this.renderMetricChart());
+                }
+            }catch(e){ this.metricsData=null; this.chartingSymbol=''; this.chartError='Could not load data. Try again.'; }
+            this.metricsLoading=false;
+        },
+        setChartFreq(f){ if(this.chartFreq===f)return; this.chartFreq=f; this.chartRange=99; if(this.chartingSymbol)this.loadMetrics(this.chartingSymbol); },
+        setChartRange(n){ this.chartRange=n; this.$nextTick(()=>this.renderMetricChart()); },
+        setOverlay(o){ this.chartOverlay=o; this.$nextTick(()=>this.renderMetricChart()); },
+        toggleMetric(k){ const i=this.selectedMetrics.indexOf(k); if(i>=0)this.selectedMetrics.splice(i,1); else{ if(this.selectedMetrics.length>=4)return; this.selectedMetrics.push(k); } this.$nextTick(()=>this.renderMetricChart()); },
+        chartRanges(){ return this.chartFreq==='annual'?[{l:'5Y',n:5},{l:'10Y',n:10},{l:'Max',n:99}]:[{l:'2Y',n:8},{l:'5Y',n:20},{l:'Max',n:99}]; },
+        metricGroups(){
+            const order=['Income Statement','Margins','Per Share','Returns','Liquidity & Leverage','Cash Flow','Valuation'];
+            const m=this.metricsData?.metrics||{}, g={};
+            Object.keys(m).forEach(k=>{(g[m[k].group]=g[m[k].group]||[]).push({key:k,label:m[k].label,unit:m[k].unit})});
+            return order.filter(o=>g[o]).map(o=>({name:o,items:g[o]}));
+        },
+        _visStart(){ const p=this.metricsData?.periods||[]; return Math.max(0,p.length-this.chartRange); },
+        fmtPeriod(d){ const y=d.slice(0,4); if(this.chartFreq==='annual')return "FY"+y.slice(2); const q=Math.floor((+d.slice(5,7)-1)/3)+1; return 'Q'+q+" '"+y.slice(2); },
+        chartPeriodLabels(){ const p=this.metricsData?.periods||[]; return p.slice(this._visStart()).map(d=>this.fmtPeriod(d)); },
+        _transform(key){ // returns {data, unit} after applying the active overlay transform
+            const m=this.metricsData.metrics[key]; let data=m.data.slice(), unit=m.unit;
+            if(this.chartOverlay==='yoy'){ const lag=this.chartFreq==='annual'?1:4; data=data.map((v,j)=>(v!=null&&data[j-lag]!=null&&data[j-lag]!==0)?+(((v-data[j-lag])/Math.abs(data[j-lag]))*100).toFixed(2):null); unit='%'; }
+            return {data,unit};
+        },
+        chartSeriesData(key){ return this._transform(key).data.slice(this._visStart()); },
+        fmtMetricVal(v,u){
+            if(v==null||v===undefined)return '–';
+            if(u==='$M'){ const a=Math.abs(v); if(a>=1e6)return (v/1e6).toFixed(2)+'T'; if(a>=1000)return '$'+(v/1000).toFixed(1)+'B'; return '$'+v.toFixed(0)+'M'; }
+            if(u==='%')return v.toFixed(1)+'%';
+            if(u==='x')return v.toFixed(2)+'×';
+            if(u==='$')return '$'+v.toFixed(2);
+            return (''+v);
+        },
+        renderMetricChart(){
+            if(typeof ApexCharts==='undefined'||!this.metricsData)return;
+            const keys=this.selectedMetrics.filter(k=>this.metricsData.metrics[k]);
+            if(!keys.length){ if(this.apex['metric-chart']){this.apex['metric-chart'].destroy();delete this.apex['metric-chart'];} return; }
+            const c=this.tc(), start=this._visStart(), labels=this.chartPeriodLabels();
+            const sma=this.chartOverlay==='sma', win=this.chartFreq==='annual'?3:4;
+            const series=[], colors=[];
+            keys.forEach((k,i)=>{
+                const t=this._transform(k), col=this.metricColors[i%this.metricColors.length];
+                const type=(this.chartOverlay!=='yoy'&&t.unit==='$M')?'column':'line';
+                series.push({name:this.metricsData.metrics[k].label+(this.chartOverlay==='yoy'?' YoY':''),type,data:t.data.slice(start),_unit:t.unit}); colors.push(col);
+                if(sma){
+                    const ma=t.data.map((_,j)=>{ if(j<win-1)return null; let s=0,n=0; for(let q=0;q<win;q++){const x=t.data[j-q]; if(x!=null){s+=x;n++;}} return n?+(s/n).toFixed(2):null; });
+                    series.push({name:this.metricsData.metrics[k].label+' '+win+(this.chartFreq==='annual'?'y':'q')+' avg',type:'line',data:ma.slice(start),_unit:t.unit,_ma:true}); colors.push(col);
+                }
+            });
+            const units=[...new Set(series.map(s=>s._unit))];
+            const yaxis=units.map((u,ui)=>({seriesName:series.filter(s=>s._unit===u).map(s=>s.name),opposite:ui>0,labels:{style:{colors:c.at},formatter:v=>this.fmtMetricVal(v,u)},title:{text:u,style:{color:c.at,fontWeight:600,fontSize:'11px'}}}));
+            const widths=series.map(s=>s.type==='line'?(s._ma?2:2.5):0);
+            const dash=series.map(s=>s._ma?6:0);
+            this.renderApex('metric-chart',{
+                chart:{type:'line',height:430,background:'transparent',fontFamily:'Inter,system-ui,sans-serif',toolbar:{show:true,tools:{download:true,zoom:true,zoomin:true,zoomout:true,reset:true,pan:false,selection:false}},animations:{enabled:true,speed:400}},
+                series,colors,
+                stroke:{width:widths,curve:'straight',dashArray:dash},
+                xaxis:{categories:labels,labels:{style:{colors:c.at,fontSize:'12px'}},axisBorder:{color:c.ag},axisTicks:{color:c.ag}},
+                yaxis,
+                plotOptions:{bar:{borderRadius:4,columnWidth:'55%'}},
+                grid:{borderColor:c.ag,strokeDashArray:3,padding:{left:8,right:8}},
+                theme:{mode:c.am},
+                legend:{labels:{colors:c.at},position:'top',horizontalAlign:'left',fontSize:'12px',markers:{radius:3}},
+                dataLabels:{enabled:false},
+                markers:{size:3,strokeWidth:0,hover:{size:5}},
+                tooltip:{theme:c.am,shared:true,intersect:false,y:{formatter:(v,o)=>this.fmtMetricVal(v,series[o.seriesIndex]?._unit)}},
+                noData:{text:'No data',style:{color:c.at}}
+            });
+        },
     };
 }
