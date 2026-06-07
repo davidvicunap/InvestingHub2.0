@@ -428,6 +428,13 @@
             <div x-show="analysisLoading" class="spinner"></div>
         </div>
 
+        <!-- Loading shell — instant structure while the quote is in flight -->
+        <div x-show="analysisLoading&&!analysisData" x-cloak class="space-y-4">
+            <div class="card p-6"><div class="flex items-center gap-5"><div class="skel w-14 h-14 rounded-2xl flex-shrink-0"></div><div class="flex-1 space-y-2"><div class="skel h-5 w-48"></div><div class="skel h-3 w-32"></div></div><div class="skel h-9 w-28"></div></div></div>
+            <div class="card p-6"><div class="skel h-5 w-32 mb-4"></div><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="skel h-44"></div><div class="skel h-44"></div></div></div>
+            <div class="grid grid-cols-3 md:grid-cols-6 gap-2"><template x-for="i in 12" :key="i"><div class="skel h-16"></div></template></div>
+        </div>
+
         <div x-show="analysisData" x-cloak>
             <!-- Header -->
             <div class="card stock-hdr p-6 mb-4">

@@ -266,8 +266,12 @@ function app() {
             if(!s)return;s=s.toUpperCase().trim();this.analysisSymbol=s;this.analysisLoading=true;
             this.analysisData=null;this.analysisStats=[];this.fundamentalsData=null;this.stockScore=null;this.secFilings=null;this.analysisTab='Overview';this.peerData=null;
             this.returnsData=null;this.valuationData=null;this.analystData=null;this.earningsData=null;this.dividendData=null;
-            try{
-                const d=await this.api(`/api/quote/${s}`);this.analysisData=d;
+            // Fire every request in parallel — none depend on the quote, so don't
+            // serialize behind it; the header lands first and each card fills in
+            // as its own response arrives.
+            this.api(`/api/quote/${s}`).then(d=>{
+                if(!d||d.error)return;
+                this.analysisData=d;
                 this.analysisStats=[
                     {label:'Mkt Cap',value:this.fmtBig(d.marketCap)},{label:'P/E',value:d.peRatio?d.peRatio.toFixed(2):'—'},
                     {label:'Fwd P/E',value:d.forwardPE?d.forwardPE.toFixed(2):'—'},{label:'EPS',value:d.eps?'$'+d.eps.toFixed(2):'—'},
@@ -276,14 +280,13 @@ function app() {
                     {label:'Volume',value:d.volume?d.volume.toLocaleString():'—'},{label:'Avg Vol',value:d.avgVolume?d.avgVolume.toLocaleString():'—'},
                     {label:'Profit Margin',value:d.profitMargin?(d.profitMargin*100).toFixed(1)+'%':'—'},{label:'ROE',value:d.returnOnEquity?(d.returnOnEquity*100).toFixed(1)+'%':'—'},
                 ];
-                this.api(`/api/returns/${s}`).then(r=>{if(!r.error)this.returnsData=r}).catch(()=>{});
-                this.api(`/api/valuation/${s}`).then(v=>{if(!v.error)this.valuationData=v}).catch(()=>{});
-                this.api(`/api/analysts/${s}`).then(a=>{if(!a.error)this.analystData=a}).catch(()=>{});
-                this.api(`/api/earnings/${s}`).then(e=>{if(!e.error){this.earningsData=e;if(this.analysisTab==='Overview')this.$nextTick(()=>this.renderEarningsChart())}}).catch(()=>{});
-                this.api(`/api/score/${s}`).then(sc=>this.stockScore=sc).catch(()=>{});
-                this.loadPeers(s);
-            }catch(e){console.error(e)}
-            this.analysisLoading=false;
+            }).catch(e=>console.error(e)).finally(()=>{this.analysisLoading=false});
+            this.api(`/api/returns/${s}`).then(r=>{if(!r.error)this.returnsData=r}).catch(()=>{});
+            this.api(`/api/valuation/${s}`).then(v=>{if(!v.error)this.valuationData=v}).catch(()=>{});
+            this.api(`/api/analysts/${s}`).then(a=>{if(!a.error)this.analystData=a}).catch(()=>{});
+            this.api(`/api/earnings/${s}`).then(e=>{if(!e.error){this.earningsData=e;if(this.analysisTab==='Overview')this.$nextTick(()=>this.renderEarningsChart())}}).catch(()=>{});
+            this.api(`/api/score/${s}`).then(sc=>{if(sc&&!sc.error)this.stockScore=sc}).catch(()=>{});
+            this.loadPeers(s);
         },
         async loadDividends(s){if(!s)return;this.dividendLoading=true;try{const d=await this.api(`/api/dividends/${s}`);if(!d.error){this.dividendData=d;this.$nextTick(()=>this.renderDividendChart())}}catch(e){}this.dividendLoading=false},
         async loadFundamentals(s){if(!s||this.fundamentalsData)return;try{const f=await this.api(`/api/fundamentals/${s}`);if(!f.error){this.fundamentalsData=f;if(this.analysisTab==='Fundamentals')this.$nextTick(()=>this.renderFundCharts())}}catch(e){}},

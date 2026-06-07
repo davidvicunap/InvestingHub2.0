@@ -5,6 +5,7 @@ import math
 import re
 import sqlite3
 import os
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -1705,10 +1706,38 @@ def api_movers():
         return jsonify({"gainers": [], "losers": []})
 
 
+# -- Keep-warm self-ping ------------------------------------------------------
+
+def _start_self_ping():
+    """On Render, ping our own public URL every 10 min so inbound traffic keeps
+    the free instance from sleeping (the 15-min idle timer is what causes the
+    1-3 min cold start). Render injects RENDER_EXTERNAL_URL, so this is a no-op
+    locally. The GitHub Actions cron remains the backup that can *wake* a slept
+    instance, since a suspended process can't ping itself.
+    """
+    base = os.environ.get("RENDER_EXTERNAL_URL")
+    if not base:
+        return
+    health = base.rstrip("/") + "/"
+
+    def loop():
+        while True:
+            time.sleep(600)
+            try:
+                req = urllib.request.Request(health, headers={"User-Agent": "investorhub-keepwarm"})
+                urllib.request.urlopen(req, timeout=30).read()
+            except Exception:
+                pass
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
 # -- Run ----------------------------------------------------------------------
 
 with app.app_context():
     init_db()
+
+_start_self_ping()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
