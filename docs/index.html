@@ -38,7 +38,13 @@
     </script>
     <style>
         [x-cloak]{display:none!important}
-        body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'cv02','cv03','cv04','cv11'}
+        /* Tabular numerals app-wide so prices/percentages align in columns. */
+        body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'cv02','cv03','cv04','cv11';font-variant-numeric:tabular-nums}
+        /* Tighten display type the way SF/Inter headings are set. */
+        h1,h2,h3{letter-spacing:-.021em}
+        /* The light accent (brand-400) is low-contrast on the bright theme — deepen
+           accent text/links to brand-600 in light mode (kept light in dark mode). */
+        html:not(.dark) .text-brand-400{color:#2563eb}
 
         /* ── Theme tokens ──
            Neutral, near-monochrome palette (Apple-grade): soft gray canvas, white
@@ -345,23 +351,23 @@
 
     <!-- ───────── DASHBOARD ───────── -->
     <div x-show="currentPage==='dashboard'" x-cloak class="fade">
-        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-6">Dashboard</h2>
+        <h2 class="text-[22px] md:text-[26px] font-semibold tracking-tight fg-0 mb-6">Dashboard</h2>
         <!-- Market indices -->
         <div class="mb-8">
             <div class="text-[11px] fg-3 uppercase tracking-wider font-semibold mb-3">Markets</div>
             <!-- skeleton -->
-            <div x-show="marketLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <template x-for="i in 5"><div class="skel h-[88px]"></div></template>
+            <div x-show="marketLoading" class="card overflow-hidden">
+                <template x-for="i in 6"><div class="px-4 py-3.5" :class="i>1?'border-t bdr-s':''"><div class="skel h-5"></div></div></template>
             </div>
-            <div x-show="!marketLoading" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                <template x-for="m in marketData" :key="m.symbol">
-                    <div class="card card-h p-4 cursor-pointer" @click="selectStock(m.symbol)">
-                        <div class="text-[11px] fg-2 font-medium mb-1" x-text="m.name"></div>
-                        <div class="text-[17px] font-bold fg-0 tabular-nums" x-text="fmtP(m.price)"></div>
-                        <div class="flex items-center gap-1 mt-1">
-                            <span :class="m.change>=0?'text-emerald-500':'text-red-500'" class="text-[13px] font-semibold tabular-nums">
-                                <span x-text="m.change>=0?'+':''"></span><span x-text="m.changePercent?.toFixed(2)"></span>%
-                            </span>
+            <!-- Grouped hairline list (Stocks-app style) instead of a grid of boxes -->
+            <div x-show="!marketLoading" class="card overflow-hidden">
+                <template x-for="(m,i) in marketData" :key="m.symbol">
+                    <div class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--bg-2)] transition-colors"
+                        :class="i>0?'border-t bdr-s':''" @click="selectStock(m.symbol)">
+                        <span class="text-[13.5px] font-medium fg-1 truncate pr-3" x-text="m.name"></span>
+                        <div class="flex items-center gap-5 flex-shrink-0">
+                            <span class="text-[14px] font-semibold fg-0" x-text="fmtP(m.price)"></span>
+                            <span :class="m.change>=0?'text-emerald-500':'text-red-500'" class="text-[13px] font-semibold w-[68px] text-right"><span x-text="m.change>=0?'+':''"></span><span x-text="m.changePercent?.toFixed(2)"></span>%</span>
                         </div>
                     </div>
                 </template>
@@ -460,7 +466,7 @@
 
     <!-- ───────── ANALYSIS ───────── -->
     <div x-show="currentPage==='analysis'" x-cloak class="fade">
-        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Stock Analysis</h2>
+        <h2 class="text-[22px] md:text-[26px] font-semibold tracking-tight fg-0 mb-1">Stock Analysis</h2>
         <p class="text-[13px] fg-2 mb-5">Fundamentals, technicals, health score & financials</p>
 
         <div class="flex items-center gap-3 mb-6">
@@ -957,7 +963,7 @@
 
     <!-- ───────── COMPARE ───────── -->
     <div x-show="currentPage==='compare'" x-cloak class="fade">
-        <h2 class="text-xl md:text-2xl font-bold fg-0 mb-1">Compare</h2>
+        <h2 class="text-[22px] md:text-[26px] font-semibold tracking-tight fg-0 mb-1">Compare</h2>
         <p class="text-[13px] fg-2 mb-5">Side-by-side comparison of up to 5 stocks</p>
         <div class="card p-5 mb-5">
             <div class="flex flex-wrap items-end gap-3">
@@ -1004,7 +1010,7 @@
     <div x-show="currentPage==='charting'" x-cloak class="fade">
         <div class="flex items-end justify-between mb-5 flex-wrap gap-3">
             <div>
-                <h2 class="text-xl md:text-2xl font-bold fg-0">Charting</h2>
+                <h2 class="text-[22px] md:text-[26px] font-semibold tracking-tight fg-0">Charting</h2>
                 <p class="text-[13px] fg-2 mt-0.5">Plot fundamentals &amp; valuation ratios over time</p>
             </div>
             <form @submit.prevent="loadMetrics(chartingInput)" class="flex items-center gap-2" role="search">
@@ -1133,7 +1139,7 @@
     <!-- ───────── PORTFOLIO ───────── -->
     <div x-show="currentPage==='portfolio'" x-cloak class="fade">
         <div class="flex items-center justify-between mb-5">
-            <div><h2 class="text-xl md:text-2xl font-bold fg-0">Portfolio</h2><p class="text-[13px] fg-2 mt-0.5">Track holdings & performance</p></div>
+            <div><h2 class="text-[22px] md:text-[26px] font-semibold tracking-tight fg-0">Portfolio</h2><p class="text-[13px] fg-2 mt-0.5">Track holdings & performance</p></div>
             <div class="flex items-center gap-2">
                 <button @click="exportPortfolioCSV()" x-show="portfolio.length" class="px-3 py-2.5 bg-[var(--bg-2)] fg-2 hover:fg-0 rounded-[10px] text-sm font-medium transition flex items-center gap-1.5"><svg aria-hidden="true" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>CSV</button>
 
