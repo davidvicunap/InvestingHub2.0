@@ -3,7 +3,6 @@ import json
 import logging
 import math
 import re
-import sqlite3
 import os
 import threading
 import time
@@ -21,6 +20,8 @@ import numpy as np
 import jwt
 import bcrypt
 
+from db import connect as db_connect, init_db, INTEGRITY_ERRORS
+
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -33,8 +34,6 @@ _allowed_origins = [
 ]
 CORS(app, origins=_allowed_origins)
 
-app.config["DATABASE"] = os.environ.get("DATABASE_PATH", os.path.join(app.root_path, "portfolio.db"))
-
 _secret = os.environ.get("SECRET_KEY", "")
 if not _secret and not os.environ.get("FLASK_DEBUG"):
     _secret = "investorhub-dev-key-local-only"
@@ -43,11 +42,12 @@ app.config["SECRET_KEY"] = _secret
 
 
 # -- Database -----------------------------------------------------------------
+# Connection handling lives in db.py (SQLite locally, Postgres when DATABASE_URL
+# is set). Routes use get_db().execute(...) identically across both backends.
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(app.config["DATABASE"])
-        g.db.row_factory = sqlite3.Row
+        g.db = db_connect()
     return g.db
 
 
@@ -56,44 +56,6 @@ def close_db(exception):
     db = g.pop("db", None)
     if db is not None:
         db.close()
-
-
-def init_db():
-    db = sqlite3.connect(app.config["DATABASE"])
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            name TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS holdings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            symbol TEXT NOT NULL,
-            name TEXT DEFAULT '',
-            shares REAL NOT NULL,
-            buy_price REAL NOT NULL,
-            buy_date TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS watchlist (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            symbol TEXT NOT NULL,
-            name TEXT DEFAULT '',
-            added_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(user_id, symbol)
-        )
-    """)
-    db.commit()
-    db.close()
 
 
 # -- Auth Helpers -------------------------------------------------------------
@@ -360,7 +322,7 @@ def api_register():
             "token": token,
             "user": {"id": user_id, "email": email, "name": name}
         }), 201
-    except sqlite3.IntegrityError:
+    except INTEGRITY_ERRORS:
         return jsonify({"error": "Email already registered"}), 409
 
 
