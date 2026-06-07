@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,47 +27,54 @@
             integrity="sha384-X9kJyAubVxnP0hcA+AMMs21U445qsnqhnUF8EBlEpP3a42Kh/JwWjlv2ZcvGfphb"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
-        // Apply theme immediately to prevent flash
+        // Light-first. Apply dark only if the user explicitly chose it, or if they
+        // have no saved choice and their system prefers dark. Runs before paint to
+        // avoid a flash.
         (function(){
             const t = localStorage.getItem('investorhub-theme');
-            if (t === 'light') document.documentElement.classList.remove('dark');
+            const wantDark = t === 'dark' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (wantDark) document.documentElement.classList.add('dark');
         })();
     </script>
     <style>
         [x-cloak]{display:none!important}
         body{font-family:'Inter',system-ui,sans-serif;font-feature-settings:'cv02','cv03','cv04','cv11'}
 
-        /* ── Theme tokens ── */
+        /* ── Theme tokens ──
+           Neutral, near-monochrome palette (Apple-grade): soft gray canvas, white
+           surfaces, true-ink text, hairline borders, whisper-quiet shadows. The
+           single blue accent (brand-*) is reserved for primary actions/selection. */
         :root{
-            --bg-0:#f8fafc;--bg-1:#ffffff;--bg-2:#f1f5f9;--bg-3:#e2e8f0;
-            --fg-0:#0f172a;--fg-1:#334155;--fg-2:#64748b;--fg-3:#94a3b8;
-            --border:#e7eaef;--border-s:#f1f5f9;--border-h:#d3d9e0;
-            --card-shadow:0 1px 2px rgba(15,23,42,.04);
-            --card-shadow-h:0 4px 16px rgba(15,23,42,.07);
-            --glass:rgba(255,255,255,.8);
+            --bg-0:#f5f5f7;--bg-1:#ffffff;--bg-2:#eeeef1;--bg-3:#e3e3e8;
+            --fg-0:#1d1d1f;--fg-1:#3f3f46;--fg-2:#6e6e76;--fg-3:#a1a1aa;
+            --border:#e7e7ec;--border-s:#f0f0f3;--border-h:#d9d9e0;
+            --card-shadow:0 1px 2px rgba(0,0,0,.04);
+            --card-shadow-h:0 2px 8px rgba(0,0,0,.06);
+            --glass:rgba(245,245,247,.72);
         }
         html.dark{
-            --bg-0:#060a14;--bg-1:#0f1729;--bg-2:#162036;--bg-3:#1e293b;
-            --fg-0:#f1f5f9;--fg-1:#cbd5e1;--fg-2:#64748b;--fg-3:#475569;
-            --border:rgba(148,163,184,.16);--border-s:rgba(148,163,184,.09);--border-h:rgba(148,163,184,.3);
-            --card-shadow:0 1px 2px rgba(0,0,0,.25);
-            --card-shadow-h:0 4px 16px rgba(0,0,0,.4);
-            --glass:rgba(10,15,26,.8);
+            --bg-0:#0a0a0b;--bg-1:#161619;--bg-2:#1d1d22;--bg-3:#28282e;
+            --fg-0:#f4f4f6;--fg-1:#c9c9ce;--fg-2:#8a8a93;--fg-3:#5a5a63;
+            --border:rgba(255,255,255,.09);--border-s:rgba(255,255,255,.05);--border-h:rgba(255,255,255,.16);
+            --card-shadow:0 1px 2px rgba(0,0,0,.4);
+            --card-shadow-h:0 2px 10px rgba(0,0,0,.5);
+            --glass:rgba(10,10,11,.72);
         }
 
         /* ── Utility classes ── */
         .bg-page{background:var(--bg-0)}.bg-card{background:var(--bg-1)}.bg-inset{background:var(--bg-2)}.bg-deep{background:var(--bg-3)}
         .fg-0{color:var(--fg-0)}.fg-1{color:var(--fg-1)}.fg-2{color:var(--fg-2)}.fg-3{color:var(--fg-3)}
         .bdr-t{border-color:var(--border)}.bdr-s{border-color:var(--border-s)}
-        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:12px;box-shadow:var(--card-shadow)}
-        .card-h{transition:border-color .15s ease,box-shadow .15s ease}.card-h:hover{border-color:var(--border-h);box-shadow:var(--card-shadow-h)}
-        .glass{background:var(--glass);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--border)}
-        .input-f{background:var(--bg-2);border:1px solid var(--border);color:var(--fg-0);border-radius:10px;transition:all .15s}
+        .card{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;box-shadow:var(--card-shadow)}
+        .card-h{transition:border-color .18s ease,box-shadow .18s ease}.card-h:hover{border-color:var(--border-h);box-shadow:var(--card-shadow-h)}
+        /* A quiet material, not gaudy glass: light blur, no saturation boost, hairline edge. */
+        .glass{background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+        .input-f{background:var(--bg-1);border:1px solid var(--border-h);color:var(--fg-0);border-radius:10px;transition:border-color .15s,box-shadow .15s}
         .input-f:focus{border-color:#2563eb;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
 
         .pill-bar{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--bg-2)}
-        .pill{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--fg-2);cursor:pointer;border:none;background:transparent;transition:all .15s;white-space:nowrap}
-        .pill:hover{color:var(--fg-0)}.pill.on{background:var(--bg-1);color:var(--fg-0);box-shadow:0 1px 2px rgba(15,23,42,.08)}
+        .pill{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--fg-2);cursor:pointer;border:none;background:transparent;transition:color .15s,background .15s;white-space:nowrap}
+        .pill:hover{color:var(--fg-0)}.pill.on{background:var(--bg-1);color:var(--fg-0);box-shadow:0 1px 2px rgba(0,0,0,.06)}
         html.dark .pill.on{background:var(--bg-3)}
 
         .fade{animation:fadeIn .35s ease-out}@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -292,7 +299,7 @@
             <input type="text" role="combobox" aria-label="Search stocks, ETFs and crypto" aria-controls="search-results" :aria-expanded="showSearchDropdown&&searchResults.length>0" autocomplete="off"
                 x-model="searchQuery" @input.debounce.400ms="searchStocks()" @focus="showSearchDropdown=true" @click.outside="showSearchDropdown=false"
                 placeholder="Search stocks, ETFs, crypto..." class="w-full pl-9 pr-3 py-2 rounded-[10px] text-sm input-f">
-            <div id="search-results" role="listbox" aria-label="Search results" x-show="showSearchDropdown&&searchResults.length" x-cloak class="absolute top-full left-0 right-0 mt-1.5 card shadow-xl z-50 max-h-72 overflow-y-auto">
+            <div id="search-results" role="listbox" aria-label="Search results" x-show="showSearchDropdown&&searchResults.length" x-cloak class="absolute top-full left-0 right-0 mt-1.5 card shadow-lg z-50 max-h-72 overflow-y-auto">
                 <template x-for="r in searchResults" :key="r.symbol">
                     <button role="option" :aria-label="r.symbol+' '+r.name" @click="selectStock(r.symbol);showSearchDropdown=false;searchQuery=''"
                         class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-2)] transition text-left" style="border-bottom:1px solid var(--border-s)">
@@ -1219,7 +1226,7 @@
 <!-- Add Holding -->
 <div x-show="showAddHolding" x-cloak @keydown.escape.window="showAddHolding=false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showAddHolding=false"></div>
-    <div role="dialog" aria-modal="true" aria-labelledby="add-holding-title" class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
+    <div role="dialog" aria-modal="true" aria-labelledby="add-holding-title" class="relative card shadow-xl w-full max-w-md p-6 fade" @click.stop>
         <h3 id="add-holding-title" class="text-base font-bold fg-0 mb-4">Add Holding</h3>
         <div class="space-y-3">
             <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol *</label><input type="text" x-model="newHolding.symbol" placeholder="AAPL" class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase" style="text-transform:uppercase"></div>
@@ -1239,7 +1246,7 @@
 <!-- Edit Holding -->
 <div x-show="showEditHolding" x-cloak @keydown.escape.window="showEditHolding=false" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="showEditHolding=false"></div>
-    <div role="dialog" aria-modal="true" aria-labelledby="edit-holding-title" class="relative card shadow-2xl w-full max-w-md p-6 fade" @click.stop>
+    <div role="dialog" aria-modal="true" aria-labelledby="edit-holding-title" class="relative card shadow-xl w-full max-w-md p-6 fade" @click.stop>
         <h3 id="edit-holding-title" class="text-base font-bold fg-0 mb-4">Edit Holding</h3>
         <div class="space-y-3">
             <div><label class="text-[11px] fg-3 font-medium block mb-1">Symbol</label><input type="text" :value="editingHolding.symbol" disabled class="w-full px-3 py-2.5 rounded-[10px] text-sm input-f uppercase opacity-60"></div>

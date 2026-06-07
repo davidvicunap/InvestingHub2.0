@@ -18,7 +18,7 @@ const LOGO_DOMAINS = {
 function app() {
     return {
         currentPage:'dashboard', searchQuery:'', searchResults:[], showSearchDropdown:false,
-        darkMode: localStorage.getItem('investorhub-theme') !== 'light',
+        darkMode: localStorage.getItem('investorhub-theme')==='dark' || (!localStorage.getItem('investorhub-theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches),
         connectionError:false, retrying:false, backendWaking:false,
 
         authToken: localStorage.getItem('investorhub-token')||'',
@@ -166,7 +166,7 @@ function app() {
         // ── Theme ──
         toggleTheme(){this.darkMode=!this.darkMode;this.applyTheme();localStorage.setItem('investorhub-theme',this.darkMode?'dark':'light');this.reRender()},
         applyTheme(){document.documentElement.classList.toggle('dark',this.darkMode)},
-        tc(){return this.darkMode?{bg:'#0f1729',grid:'#1e293b',text:'#94a3b8',cross:'#475569',border:'#334155',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e2e8f0',am:'dark',ag:'#1e293b',at:'#94a3b8'}:{bg:'#fff',grid:'#f1f5f9',text:'#64748b',cross:'#94a3b8',border:'#e2e8f0',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#334155',am:'light',ag:'#f1f5f9',at:'#64748b'}},
+        tc(){return this.darkMode?{bg:'#161619',grid:'#26262b',text:'#8a8a93',cross:'#5a5a63',border:'#2a2a30',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.25)',vDn:'rgba(239,68,68,.25)',line:'#e4e4e7',am:'dark',ag:'#26262b',at:'#8a8a93'}:{bg:'#ffffff',grid:'#eeeef1',text:'#6e6e76',cross:'#a1a1aa',border:'#e7e7ec',up:'#10b981',dn:'#ef4444',vUp:'rgba(16,185,129,.3)',vDn:'rgba(239,68,68,.3)',line:'#3f3f46',am:'light',ag:'#eeeef1',at:'#6e6e76'}},
         reRender(){if(this.currentPage==='analysis'&&this.analysisData){if(this.analysisTab==='Overview')this.renderEarningsChart();if(this.analysisTab==='Chart')this.loadPriceChart();if(this.analysisTab==='Technicals')this.loadTech();if(this.analysisTab==='Fundamentals'&&this.fundamentalsData)this.renderFundCharts();if(this.analysisTab==='Dividends')this.renderDividendChart()}if(this.currentPage==='compare'&&this.compareData){this.renderCmpChart();this.renderCmpRadar()}if(this.currentPage==='portfolio'){if(this.portfolio.length)this.renderPortCharts();this.renderSectorChart()}if(this.currentPage==='dashboard'&&this.portfolio.length)this.renderPortCharts();if(this.currentPage==='charting'&&this.metricsData)this.renderMetricChart()},
 
         // ── Nav ──
