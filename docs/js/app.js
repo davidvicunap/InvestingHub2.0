@@ -90,8 +90,19 @@ function app() {
 
         init() {
             this.applyTheme();
-            this._warmBackend();   // loads initial data once the backend responds
+            this._hydrateCache();            // restore last-known data from localStorage
+            if(this.authToken)this._showCached();  // paint it instantly (before the backend even wakes)
+            this._warmBackend();             // then refresh once the backend responds
             this._waitForLibs();
+        },
+        // Paint the dashboard from persisted cache immediately so a returning
+        // visitor sees content right away instead of skeletons during the
+        // free-tier cold start. Fresh data overwrites it once the backend wakes.
+        _showCached(){
+            const mk=this._staleGet('/api/market'); if(mk&&mk.length)this.marketData=mk;
+            const mv=this._staleGet('/api/movers'); if(mv&&!mv.error)this.movers=mv;
+            const wl=this._staleGet('/api/watchlist'); if(Array.isArray(wl))this.watchlist=wl;
+            const pf=this._staleGet('/api/portfolio'); if(Array.isArray(pf)){this.portfolio=pf;this.$nextTick(()=>{if(pf.length)this.renderPortCharts()})}
         },
         async _warmBackend(){
             // Poll the health endpoint until the backend is up (free-tier cold
@@ -188,7 +199,10 @@ function app() {
             for(const[p,t]of this._cachePrefixTTLs)if(u.startsWith(p))return t;
             return 0;
         },
-        clearCache(pattern){if(!pattern){this._apiCache={};return}for(const k of Object.keys(this._apiCache))if(k.includes(pattern))delete this._apiCache[k]},
+        clearCache(pattern){if(!pattern){this._apiCache={};try{localStorage.removeItem('ih-cache')}catch(e){}return}for(const k of Object.keys(this._apiCache))if(k.includes(pattern))delete this._apiCache[k];this._persistCache()},
+        _hydrateCache(){try{const raw=localStorage.getItem('ih-cache');if(raw){const o=JSON.parse(raw);if(o&&typeof o==='object')this._apiCache=o}}catch(e){}},
+        _persistCache(){try{const ks=Object.keys(this._apiCache);ks.sort((a,b)=>this._apiCache[b].t-this._apiCache[a].t);const o={};let n=0;for(const k of ks){if(n>=40)break;try{const s=JSON.stringify(this._apiCache[k]);if(s.length>80000)continue;o[k]=this._apiCache[k];n++}catch(e){}}localStorage.setItem('ih-cache',JSON.stringify(o))}catch(e){}},
+        _staleGet(u){const c=this._apiCache[u];return c?c.d:null},
         async api(u,skipCache){
             const ttl=this._getCacheTTL(u);
             if(!skipCache&&ttl){const c=this._apiCache[u];if(c&&(Date.now()/1000-c.t)<ttl)return c.d}
@@ -202,6 +216,7 @@ function app() {
                     const keys=Object.keys(this._apiCache);
                     if(keys.length>100){keys.sort((a,b)=>this._apiCache[a].t-this._apiCache[b].t);for(const k of keys.slice(0,50))delete this._apiCache[k]}
                     this._apiCache[u]={d:data,t:Date.now()/1000};
+                    this._persistCache();   // survive reloads for instant next-visit paint
                 }
                 return data;
             }catch(e){
@@ -228,8 +243,8 @@ function app() {
         },
 
         // ── Market ──
-        async loadMarketData(){this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
-        async loadMovers(){this.moversLoading=true;try{const m=await this.api('/api/movers');if(m&&!m.error)this.movers=m}catch(e){}this.moversLoading=false},
+        async loadMarketData(){if(!this.marketData.length)this.marketLoading=true;try{this.marketData=await this.api('/api/market')}catch(e){}this.marketLoading=false},
+        async loadMovers(){if(!(this.movers.gainers.length||this.movers.losers.length))this.moversLoading=true;try{const m=await this.api('/api/movers');if(m&&!m.error)this.movers=m}catch(e){}this.moversLoading=false},
         edgarUrl(sym,form){return`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${encodeURIComponent(sym)}&type=${encodeURIComponent(form)}&dateb=&owner=include&count=10&search_text=&action=getcompany`},
         async loadSecFilings(s){
             if(!s)return;this.secFilingsLoading=true;
@@ -240,12 +255,12 @@ function app() {
         },
 
         // ── Watchlist ──
-        async loadWatchlist(){this.watchlistLoading=true;try{this.watchlist=await this.api('/api/watchlist')}catch(e){}this.watchlistLoading=false},
+        async loadWatchlist(){if(!this.watchlist.length)this.watchlistLoading=true;try{this.watchlist=await this.api('/api/watchlist')}catch(e){}this.watchlistLoading=false},
         async addToWatchlist(s){if(!s)return;await this.post('/api/watchlist',{symbol:s.toUpperCase()});this.clearCache('/api/watchlist');this.loadWatchlist()},
         async removeFromWatchlist(s){await this.del(`/api/watchlist/${s}`);this.clearCache('/api/watchlist');this.loadWatchlist()},
 
         // ── Portfolio ──
-        async loadPortfolio(){this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false;if(this.portfolio.length)this.loadPortfolioAnalytics()},
+        async loadPortfolio(){if(!this.portfolio.length)this.portfolioLoading=true;try{this.portfolio=await this.api('/api/portfolio');if(this.currentPage==='dashboard'||this.currentPage==='portfolio')this.$nextTick(()=>{if(this.portfolio.length)this.renderPortCharts()})}catch(e){}this.portfolioLoading=false;if(this.portfolio.length)this.loadPortfolioAnalytics()},
         async loadPortfolioAnalytics(){if(!this.authToken)return;this.portfolioAnalyticsLoading=true;try{const a=await this.api('/api/portfolio/analytics');if(a&&!a.error){this.portfolioAnalytics=a;if(a.sectorAllocation?.length)this.$nextTick(()=>this.renderSectorChart())}}catch(e){}this.portfolioAnalyticsLoading=false},
         renderSectorChart(){const a=this.portfolioAnalytics;if(!a?.sectorAllocation?.length||!document.getElementById('p-sector'))return;const c=this.tc();this.renderApex('p-sector',{chart:{type:'donut',height:260,background:'transparent'},series:a.sectorAllocation.map(s=>s.value),labels:a.sectorAllocation.map(s=>s.sector),colors:['#2563eb','#06b6d4','#f59e0b','#ef4444','#10b981','#8b5cf6','#f97316','#ec4899','#64748b','#14b8a6','#a855f7'],theme:{mode:c.am},plotOptions:{pie:{donut:{size:'65%',labels:{show:true,name:{color:c.at,fontSize:'12px'},value:{color:c.at,formatter:v=>'$'+parseFloat(v).toLocaleString(undefined,{maximumFractionDigits:0})},total:{show:true,color:c.at,label:'Sectors',formatter:()=>a.sectorAllocation.length}}}}},legend:{position:'bottom',labels:{colors:c.at},fontSize:'11px'},stroke:{colors:[c.bg]},dataLabels:{enabled:false},tooltip:{theme:c.am,y:{formatter:v=>'$'+parseFloat(v).toLocaleString(undefined,{maximumFractionDigits:0})}}})},
         async addHolding(){if(!this.newHolding.symbol||!this.newHolding.shares||!this.newHolding.buy_price)return;await this.post('/api/portfolio',this.newHolding);this.newHolding={symbol:'',shares:'',buy_price:'',buy_date:'',notes:''};this.showAddHolding=false;this.clearCache('/api/portfolio');this.loadPortfolio()},

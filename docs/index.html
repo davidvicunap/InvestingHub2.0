@@ -319,6 +319,12 @@
         </div>
     </header>
 
+    <!-- Backend waking banner (cold start) — shown in-app, not just on landing -->
+    <div role="status" aria-live="polite" x-show="backendWaking" x-cloak class="mx-4 md:mx-6 lg:mx-8 mt-4 p-3 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center gap-3">
+        <div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#2563eb"></div>
+        <p class="text-[12px] fg-1"><span class="font-semibold fg-0">Waking the server…</span> showing your last saved data meanwhile — live figures refresh in a few seconds.</p>
+    </div>
+
     <!-- Connection error banner -->
     <div role="status" aria-live="polite" x-show="connectionError" x-cloak class="mx-4 md:mx-6 lg:mx-8 mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
