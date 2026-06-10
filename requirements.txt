@@ -5,8 +5,9 @@ pandas>=2.0
 numpy>=1.24
 lxml>=5.0
 gunicorn>=21.0
-PyJWT>=2.8
-bcrypt>=4.0
+# WebSocket bridge for the live market-data stream (works with gunicorn's
+# threaded sync workers via simple-websocket).
+flask-sock>=0.7
 # Postgres driver + pool — only used when DATABASE_URL is set (production).
 # Local dev falls back to SQLite and never imports these.
 psycopg[binary]>=3.1

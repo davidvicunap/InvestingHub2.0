@@ -1,8 +1,13 @@
-# Build the static frontend (Tailwind + minified JS) and deploy to GitHub Pages.
-# The repo keeps app.js / app.css as readable source; minification happens here
-# at deploy time into the _site artifact, so there is no generated file to keep
-# in sync (and nothing stale can be committed by accident).
-name: Deploy frontend to GitHub Pages
+# Build the Vite (React/TS) terminal in frontend/ and deploy to GitHub Pages.
+# The build outputs to docs/ (vite.config: outDir ../docs), which is copied into
+# the _site artifact.
+#
+# Required repo configuration (Settings -> Secrets and variables -> Actions ->
+# Variables) so the static site can reach the Render backend:
+#   API_BASE  e.g. https://investorhub.onrender.com
+#   WS_URL    e.g. wss://investorhub.onrender.com/ws
+# (Without these the app falls back to same-origin, which won't reach the API.)
+name: Deploy terminal to GitHub Pages
 
 on:
   push:
@@ -31,18 +36,25 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        working-directory: frontend
         run: npm ci
 
-      - name: Build CSS (Tailwind, purged + minified)
-        run: npm run build:css
+      - name: Build terminal (Vite)
+        working-directory: frontend
+        env:
+          # GitHub Pages serves this repo under /<repo>/, so the asset base must match.
+          VITE_BASE: /${{ github.event.repository.name }}/
+          VITE_API_BASE: ${{ vars.API_BASE }}
+          VITE_WS_URL: ${{ vars.WS_URL }}
+        run: npm run build   # outputs to ../docs
 
-      - name: Assemble and minify into _site
+      - name: Assemble _site
         run: |
           rm -rf _site && mkdir -p _site
           cp -r docs/. _site/
-          npx esbuild _site/js/app.js --minify --allow-overwrite --outfile=_site/js/app.js
           touch _site/.nojekyll   # serve files as-is, skip Jekyll processing
 
       - name: Setup Pages

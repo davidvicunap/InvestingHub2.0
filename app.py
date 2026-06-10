@@ -17,8 +17,6 @@ from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import jwt
-import bcrypt
 
 from db import connect as db_connect, init_db, INTEGRITY_ERRORS
 
@@ -26,19 +24,17 @@ log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Single-user terminal: there is no sign-in. Every portfolio/watchlist row is
+# owned by this fixed id, so the existing user-scoped SQL and schema keep
+# working unchanged (the column is simply always 1).
+SINGLE_USER_ID = 1
+
 _allowed_origins = [
     "https://davidvicunap.github.io",
-    # Any localhost port for local development (CORS guards browsers, not the
-    # server; authenticated calls still require a valid JWT).
+    # Any localhost port for local development (Vite dev server, etc.).
     re.compile(r"^http://(localhost|127\.0\.0\.1):\d+$"),
 ]
 CORS(app, origins=_allowed_origins)
-
-_secret = os.environ.get("SECRET_KEY", "")
-if not _secret and not os.environ.get("FLASK_DEBUG"):
-    _secret = "investorhub-dev-key-local-only"
-    log.warning("SECRET_KEY not set — using insecure dev default. Set SECRET_KEY env var in production.")
-app.config["SECRET_KEY"] = _secret
 
 
 # -- Database -----------------------------------------------------------------
@@ -56,49 +52,6 @@ def close_db(exception):
     db = g.pop("db", None)
     if db is not None:
         db.close()
-
-
-# -- Auth Helpers -------------------------------------------------------------
-
-def create_token(user_id, email):
-    payload = {
-        "user_id": user_id,
-        "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(days=30),
-        "iat": datetime.now(timezone.utc),
-    }
-    return jwt.encode(payload, app.config["SECRET_KEY"], algorithm="HS256")
-
-
-def get_current_user():
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return None
-    token = auth_header[7:]
-    try:
-        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
-        return payload
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-        return None
-
-
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        user = get_current_user()
-        if not user:
-            return jsonify({"error": "Authentication required"}), 401
-        g.current_user = user
-        return f(*args, **kwargs)
-    return decorated
-
-
-def optional_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        g.current_user = get_current_user()
-        return f(*args, **kwargs)
-    return decorated
 
 
 # -- Rate Limiting (in-memory, per-IP) ----------------------------------------
@@ -226,6 +179,67 @@ def peg_ratio(info):
     return safe_get(info, "pegRatio", 0) or safe_get(info, "trailingPegRatio", 0) or 0
 
 
+def _fast_attr(fi, *names):
+    """Read the first present attr/key from a yfinance FastInfo (its surface
+    varies across versions — sometimes attribute, sometimes mapping)."""
+    for n in names:
+        try:
+            v = getattr(fi, n)
+            if v is not None:
+                return v
+        except Exception:
+            pass
+        try:
+            v = fi[n]
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    return None
+
+
+def live_quote(symbol: str) -> dict:
+    """A cheap, frequently-pollable tick for the WebSocket stream.
+
+    Uses yfinance ``fast_info`` (no full ``.info`` payload) for the live price
+    and falls back to the cached ``.info`` only when needed. Returned in the
+    same unified tick shape the frontend DataNormalizer expects.
+    """
+    s = symbol.upper().strip()
+    price = prev = vol = None
+    try:
+        fi = get_ticker(s).fast_info
+        price = _fast_attr(fi, "last_price", "lastPrice")
+        prev = _fast_attr(fi, "previous_close", "previousClose")
+        vol = _fast_attr(fi, "last_volume", "lastVolume", "volume")
+    except Exception:
+        pass
+    if price is None or prev is None:
+        try:
+            info = get_info(s)
+            if price is None:
+                price = safe_get(info, "currentPrice") or safe_get(info, "regularMarketPrice", 0)
+            if prev is None:
+                prev = safe_get(info, "previousClose", 0)
+            if vol is None:
+                vol = safe_get(info, "volume") or safe_get(info, "regularMarketVolume", 0)
+        except Exception:
+            pass
+    price = float(price or 0)
+    prev = float(prev or 0)
+    change = round(price - prev, 4) if price and prev else 0
+    change_pct = round((price - prev) / prev * 100, 4) if prev else 0
+    return {
+        "symbol": s,
+        "price": price,
+        "prevClose": prev,
+        "change": change,
+        "changePercent": change_pct,
+        "volume": int(vol or 0),
+        "ts": int(time.time() * 1000),
+    }
+
+
 # -- Response Cache -----------------------------------------------------------
 
 _resp_cache = LRUCache(maxsize=300, default_ttl=60)
@@ -288,79 +302,6 @@ def _compress(response):
 @app.route("/")
 def health():
     return jsonify({"status": "ok"})
-
-
-# -- API: Auth ----------------------------------------------------------------
-
-@app.route("/api/auth/register", methods=["POST"])
-def api_register():
-    if not rate_limit("register", max_hits=10, window=3600):
-        return jsonify({"error": "Too many attempts. Please try again later."}), 429
-    data = request.get_json()
-    if not data or not data.get("email") or not data.get("password"):
-        return jsonify({"error": "Email and password are required"}), 400
-
-    email = data["email"].strip().lower()
-    password = data["password"]
-    name = data.get("name", "").strip()
-
-    if len(password) < 6:
-        return jsonify({"error": "Password must be at least 6 characters"}), 400
-
-    password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-    db = get_db()
-    try:
-        cursor = db.execute(
-            "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)",
-            (email, password_hash, name)
-        )
-        db.commit()
-        user_id = cursor.lastrowid
-        token = create_token(user_id, email)
-        return jsonify({
-            "token": token,
-            "user": {"id": user_id, "email": email, "name": name}
-        }), 201
-    except INTEGRITY_ERRORS:
-        return jsonify({"error": "Email already registered"}), 409
-
-
-@app.route("/api/auth/login", methods=["POST"])
-def api_login():
-    if not rate_limit("login", max_hits=15, window=300):
-        return jsonify({"error": "Too many login attempts. Please wait a few minutes."}), 429
-    data = request.get_json()
-    if not data or not data.get("email") or not data.get("password"):
-        return jsonify({"error": "Email and password are required"}), 400
-
-    email = data["email"].strip().lower()
-    password = data["password"]
-
-    db = get_db()
-    user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    if not user:
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    if not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"].encode("utf-8")):
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    token = create_token(user["id"], email)
-    return jsonify({
-        "token": token,
-        "user": {"id": user["id"], "email": user["email"], "name": user["name"]}
-    })
-
-
-@app.route("/api/auth/me", methods=["GET"])
-@require_auth
-def api_me():
-    user = g.current_user
-    db = get_db()
-    row = db.execute("SELECT id, email, name, created_at FROM users WHERE id = ?", (user["user_id"],)).fetchone()
-    if not row:
-        return jsonify({"error": "User not found"}), 404
-    return jsonify(dict(row))
 
 
 # -- API: Search --------------------------------------------------------------
@@ -479,13 +420,20 @@ def api_history(symbol):
         if df.empty:
             return jsonify({"error": "No data found"}), 404
         df = df.reset_index()
-        df["date"] = df["Date"].dt.strftime("%Y-%m-%d")
-        df["timestamp"] = (df["Date"].astype("int64") // 10**6).astype(int)
+        # The datetime column is "Date" for daily bars, "Datetime" for intraday.
+        dtcol = "Date" if "Date" in df.columns else ("Datetime" if "Datetime" in df.columns else df.columns[0])
+        # Drop gap/holiday bars with missing OHLC — yfinance leaves NaN there, and
+        # jsonify would emit a literal `NaN` token (invalid JSON the browser rejects).
+        df = df.dropna(subset=["Open", "High", "Low", "Close"])
+        # Epoch milliseconds, resolution-independent. yfinance/pandas may return
+        # datetime64 in s/ms/us/ns units; deriving from the Timestamp avoids the
+        # classic "assume nanoseconds" bug that mangles the value otherwise.
         records = df.apply(lambda r: {
-            "date": r["date"], "timestamp": r["timestamp"],
+            "date": pd.Timestamp(r[dtcol]).strftime("%Y-%m-%d"),
+            "timestamp": int(pd.Timestamp(r[dtcol]).timestamp() * 1000),
             "open": round(float(r["Open"]), 2), "high": round(float(r["High"]), 2),
             "low": round(float(r["Low"]), 2), "close": round(float(r["Close"]), 2),
-            "volume": int(r["Volume"]),
+            "volume": int(r["Volume"]) if pd.notna(r["Volume"]) else 0,
         }, axis=1).tolist()
         return jsonify(records)
     except Exception:
@@ -806,11 +754,9 @@ def api_compare():
 # -- API: Portfolio CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/portfolio", methods=["GET"])
-@require_auth
 def api_portfolio_list():
     db = get_db()
-    user = g.current_user
-    rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (user["user_id"],)).fetchall()
+    rows = db.execute("SELECT * FROM holdings WHERE user_id = ? ORDER BY created_at DESC", (SINGLE_USER_ID,)).fetchall()
     holdings = [dict(r) for r in rows]
 
     def enrich_holding(h):
@@ -830,7 +776,6 @@ def api_portfolio_list():
 
 
 @app.route("/api/portfolio", methods=["POST"])
-@require_auth
 def api_portfolio_add():
     data = request.get_json()
     if not data or not data.get("symbol") or not data.get("shares") or not data.get("buy_price"):
@@ -843,8 +788,7 @@ def api_portfolio_add():
     if shares <= 0 or buy_price <= 0:
         return jsonify({"error": "shares and buy_price must be positive"}), 400
     db = get_db()
-    user = g.current_user
-    user_id = user["user_id"]
+    user_id = SINGLE_USER_ID
     symbol = data["symbol"].upper().strip()
     name = data.get("name", "")
     if not name:
@@ -863,14 +807,12 @@ def api_portfolio_add():
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["PUT"])
-@require_auth
 def api_portfolio_update(holding_id):
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
     db = get_db()
-    user = g.current_user
-    row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"])).fetchone()
+    row = db.execute("SELECT id FROM holdings WHERE id = ? AND user_id = ?", (holding_id, SINGLE_USER_ID)).fetchone()
     if not row:
         return jsonify({"error": "Holding not found"}), 404
     fields = []
@@ -888,11 +830,9 @@ def api_portfolio_update(holding_id):
 
 
 @app.route("/api/portfolio/<int:holding_id>", methods=["DELETE"])
-@require_auth
 def api_portfolio_delete(holding_id):
     db = get_db()
-    user = g.current_user
-    db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, user["user_id"]))
+    db.execute("DELETE FROM holdings WHERE id = ? AND user_id = ?", (holding_id, SINGLE_USER_ID))
     db.commit()
     return jsonify({"message": "Holding deleted"})
 
@@ -900,11 +840,9 @@ def api_portfolio_delete(holding_id):
 # -- API: Watchlist CRUD (with optional auth) ---------------------------------
 
 @app.route("/api/watchlist", methods=["GET"])
-@require_auth
 def api_watchlist_list():
     db = get_db()
-    user = g.current_user
-    rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (user["user_id"],)).fetchall()
+    rows = db.execute("SELECT * FROM watchlist WHERE user_id = ? ORDER BY added_at DESC", (SINGLE_USER_ID,)).fetchall()
     items = [dict(r) for r in rows]
 
     def enrich_watchlist_item(item):
@@ -928,7 +866,6 @@ def api_watchlist_list():
 
 
 @app.route("/api/watchlist", methods=["POST"])
-@require_auth
 def api_watchlist_add():
     data = request.get_json()
     if not data or not data.get("symbol"):
@@ -942,8 +879,7 @@ def api_watchlist_add():
         except Exception:
             name = symbol
     db = get_db()
-    user = g.current_user
-    user_id = user["user_id"]
+    user_id = SINGLE_USER_ID
     try:
         db.execute(
             "INSERT OR IGNORE INTO watchlist (user_id, symbol, name) VALUES (?, ?, ?)",
@@ -956,11 +892,9 @@ def api_watchlist_add():
 
 
 @app.route("/api/watchlist/<symbol>", methods=["DELETE"])
-@require_auth
 def api_watchlist_delete(symbol):
     db = get_db()
-    user = g.current_user
-    db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), user["user_id"]))
+    db.execute("DELETE FROM watchlist WHERE symbol = ? AND user_id = ?", (symbol.upper(), SINGLE_USER_ID))
     db.commit()
     return jsonify({"message": f"{symbol} removed from watchlist"})
 
@@ -1726,13 +1660,11 @@ def api_earnings(symbol):
 # -- API: Portfolio Analytics -------------------------------------------------
 
 @app.route("/api/portfolio/analytics")
-@require_auth
 def api_portfolio_analytics():
     """Portfolio-level intelligence: sector mix, income, beta, concentration and
     a benchmark read — the context a P&L table alone can't give."""
     db = get_db()
-    user = g.current_user
-    rows = db.execute("SELECT * FROM holdings WHERE user_id = ?", (user["user_id"],)).fetchall()
+    rows = db.execute("SELECT * FROM holdings WHERE user_id = ?", (SINGLE_USER_ID,)).fetchall()
     holdings = [dict(r) for r in rows]
     if not holdings:
         return jsonify({"holdings": 0})
@@ -1876,6 +1808,11 @@ with app.app_context():
     init_db()
 
 _start_self_ping()
+
+# WebSocket stream bridge (/ws). yfinance has no push feed, so the server polls
+# and fans quotes out to subscribed clients — the browser sees a real WS stream.
+from stream import init_stream
+init_stream(app, live_quote)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8050))
